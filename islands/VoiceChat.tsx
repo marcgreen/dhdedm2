@@ -2,26 +2,6 @@ import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 import { IS_BROWSER } from "$fresh/runtime.ts";
 
-// Conditional imports for browser environment only
-let openaiAgents: any = null;
-let RealtimeAgent: any = null;
-let RealtimeSession: any = null;
-
-if (IS_BROWSER) {
-  // These will be loaded dynamically when needed
-  try {
-    import('@openai/agents').then(module => {
-      openaiAgents = module;
-    });
-    import('@openai/agents/realtime').then(module => {
-      RealtimeAgent = module.RealtimeAgent;
-      RealtimeSession = module.RealtimeSession;
-    });
-  } catch (error) {
-    console.warn('OpenAI agents not available:', error);
-  }
-}
-
 interface VoiceChatProps {}
 
 interface CharacterState {
@@ -214,15 +194,9 @@ export default function VoiceChat(_props: VoiceChatProps) {
     gameState.value = newState;
   };
 
-  // Create game state management tools
+  // Create game state management tools using dynamic imports
   const createGameStateTools = async () => {
-    if (!openaiAgents?.tool) {
-      // Wait for the module to load
-      const agentsModule = await import('@openai/agents');
-      openaiAgents = agentsModule;
-    }
-
-    const { tool } = openaiAgents;
+    const { tool } = await import('@openai/agents');
 
     const updateCharacterTool = tool({
       name: 'update_character',
@@ -345,7 +319,7 @@ export default function VoiceChat(_props: VoiceChatProps) {
         additionalProperties: true,
       },
       async execute(args: any) {
-        const rolls: number[] = [];
+        const rolls = [];
         const count = args.count || 1;
         const modifier = args.modifier || 0;
         
@@ -466,7 +440,7 @@ export default function VoiceChat(_props: VoiceChatProps) {
       manageQuestsTool,
       trackLanguageTool,
       addGameLogTool,
-    ] as any[];
+    ];
   };
 
   const startVoiceChat = async () => {
@@ -499,14 +473,10 @@ export default function VoiceChat(_props: VoiceChatProps) {
       
       status.value = "Connecting to OpenAI...";
       
-      // Load the realtime modules if not already loaded
-      if (!RealtimeAgent || !RealtimeSession) {
-        const realtimeModule = await import('@openai/agents/realtime');
-        RealtimeAgent = realtimeModule.RealtimeAgent;
-        RealtimeSession = realtimeModule.RealtimeSession;
-      }
+      // Follow the EXACT pattern from the docs
+      const { RealtimeAgent, RealtimeSession } = await import('@openai/agents/realtime');
       
-      // Create tools
+      // Create tools using dynamic imports
       const tools = await createGameStateTools();
       
       const agent = new RealtimeAgent({
