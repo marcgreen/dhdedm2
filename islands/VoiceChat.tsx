@@ -92,7 +92,25 @@ export default function VoiceChat(_props: VoiceChatProps) {
     
     try {
       if (sessionRef.current) {
-        await sessionRef.current.disconnect();
+        // Try different common methods for stopping the session
+        console.log('Available methods on session:', Object.getOwnPropertyNames(sessionRef.current));
+        
+        if (typeof sessionRef.current.close === 'function') {
+          await sessionRef.current.close();
+          console.log('Session closed using close()');
+        } else if (typeof sessionRef.current.stop === 'function') {
+          await sessionRef.current.stop();
+          console.log('Session stopped using stop()');
+        } else if (typeof sessionRef.current.end === 'function') {
+          await sessionRef.current.end();
+          console.log('Session ended using end()');
+        } else if (typeof sessionRef.current.destroy === 'function') {
+          sessionRef.current.destroy();
+          console.log('Session destroyed using destroy()');
+        } else {
+          console.log('No explicit disconnect method found, setting to null');
+        }
+        
         sessionRef.current = null;
       }
       
@@ -102,6 +120,10 @@ export default function VoiceChat(_props: VoiceChatProps) {
     } catch (error) {
       console.error('Error stopping voice chat:', error);
       status.value = "Error stopping session";
+      // Still reset the state even if there's an error
+      isConnected.value = false;
+      isConnecting.value = false;
+      sessionRef.current = null;
     }
   };
 
