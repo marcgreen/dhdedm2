@@ -131,11 +131,17 @@ export default function VoiceChat(_props: VoiceChatProps) {
     const updateInventoryTool = tool({
       name: 'update_inventory',
       description: 'Add or remove items from character inventory',
-      parameters: z.object({
-        action: z.enum(['add', 'remove']),
-        items: z.array(z.string()),
-      }),
-      async execute(args) {
+      strict: false,
+      parameters: {
+        type: 'object',
+        properties: {
+          action: { type: 'string', enum: ['add', 'remove'] },
+          items: { type: 'array', items: { type: 'string' } },
+        },
+        required: ['action', 'items'],
+        additionalProperties: true,
+      },
+      async execute(args: any) {
         const newState = { ...gameState.value };
         
         if (args.action === 'add') {
@@ -152,12 +158,18 @@ export default function VoiceChat(_props: VoiceChatProps) {
     const updateSceneTool = tool({
       name: 'update_scene',
       description: 'Update the current scene, description, and location',
-      parameters: z.object({
-        scene: z.string(),
-        description: z.string(),
-        location: z.string().optional(),
-      }),
-      async execute(args) {
+      strict: false,
+      parameters: {
+        type: 'object',
+        properties: {
+          scene: { type: 'string' },
+          description: { type: 'string' },
+          location: { type: 'string' },
+        },
+        required: ['scene', 'description'],
+        additionalProperties: true,
+      },
+      async execute(args: any) {
         const newState = { ...gameState.value };
         
         newState.currentScene = args.scene;
@@ -172,19 +184,28 @@ export default function VoiceChat(_props: VoiceChatProps) {
     const rollDiceTool = tool({
       name: 'roll_dice',
       description: 'Roll dice for game mechanics (d4, d6, d8, d10, d12, d20, d100)',
-      parameters: z.object({
-        sides: z.number(),
-        count: z.number().default(1),
-        modifier: z.number().default(0),
-      }),
-      async execute(args) {
+      strict: false,
+      parameters: {
+        type: 'object',
+        properties: {
+          sides: { type: 'number' },
+          count: { type: 'number', default: 1 },
+          modifier: { type: 'number', default: 0 },
+        },
+        required: ['sides'],
+        additionalProperties: true,
+      },
+      async execute(args: any) {
         const rolls = [];
-        for (let i = 0; i < args.count; i++) {
+        const count = args.count || 1;
+        const modifier = args.modifier || 0;
+        
+        for (let i = 0; i < count; i++) {
           rolls.push(Math.floor(Math.random() * args.sides) + 1);
         }
-        const total = rolls.reduce((sum, roll) => sum + roll, 0) + args.modifier;
+        const total = rolls.reduce((sum, roll) => sum + roll, 0) + modifier;
         
-        const rollString = `${args.count}d${args.sides}${args.modifier > 0 ? `+${args.modifier}` : args.modifier < 0 ? `${args.modifier}` : ''}`;
+        const rollString = `${count}d${args.sides}${modifier > 0 ? `+${modifier}` : modifier < 0 ? `${modifier}` : ''}`;
         const result = `Rolled ${rollString}: [${rolls.join(', ')}] = ${total}`;
         
         // Add to game log
@@ -199,12 +220,18 @@ export default function VoiceChat(_props: VoiceChatProps) {
     const manageQuestsTool = tool({
       name: 'manage_quests',
       description: 'Add, complete, or update quests',
-      parameters: z.object({
-        action: z.enum(['add', 'complete', 'update']),
-        quest: z.string(),
-        index: z.number().optional(),
-      }),
-      async execute(args) {
+      strict: false,
+      parameters: {
+        type: 'object',
+        properties: {
+          action: { type: 'string', enum: ['add', 'complete', 'update'] },
+          quest: { type: 'string' },
+          index: { type: 'number' },
+        },
+        required: ['action', 'quest'],
+        additionalProperties: true,
+      },
+      async execute(args: any) {
         const newState = { ...gameState.value };
         
         if (args.action === 'add') {
@@ -226,11 +253,17 @@ export default function VoiceChat(_props: VoiceChatProps) {
     const trackLanguageTool = tool({
       name: 'track_language',
       description: 'Track German language learning progress',
-      parameters: z.object({
-        corrections: z.number().optional(),
-        newVocabulary: z.array(z.string()).optional(),
-      }),
-      async execute(args) {
+      strict: false,
+      parameters: {
+        type: 'object',
+        properties: {
+          corrections: { type: 'number' },
+          newVocabulary: { type: 'array', items: { type: 'string' } },
+        },
+        required: [],
+        additionalProperties: true,
+      },
+      async execute(args: any) {
         const newState = { ...gameState.value };
         
         if (args.corrections) {
@@ -248,10 +281,16 @@ export default function VoiceChat(_props: VoiceChatProps) {
     const addGameLogTool = tool({
       name: 'add_game_log',
       description: 'Add important events to the game log',
-      parameters: z.object({
-        entry: z.string(),
-      }),
-      async execute(args) {
+      strict: false,
+      parameters: {
+        type: 'object',
+        properties: {
+          entry: { type: 'string' },
+        },
+        required: ['entry'],
+        additionalProperties: true,
+      },
+      async execute(args: any) {
         const newState = { ...gameState.value };
         newState.gameLog.push(`${new Date().toLocaleTimeString()}: ${args.entry}`);
         gameState.value = newState;
