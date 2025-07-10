@@ -80,8 +80,195 @@ export default function VoiceChat(_props: VoiceChatProps) {
       });
   }, []);
 
-  // We'll add function calling tools in a future iteration
-  // For now, the agent will manage state through natural language descriptions
+  // Create game state management tools using dynamic imports
+  const createGameStateTools = async () => {
+    const { tool } = await import('@openai/agents');
+
+    const updateCharacterTool = tool({
+      name: 'update_character',
+      description: 'Update character information including name, level, HP, attributes, and location',
+      strict: false,
+      parameters: {
+        type: 'object',
+        properties: {
+          name: { type: 'string' },
+          level: { type: 'number' },
+          hitPoints: { type: 'number' },
+          maxHitPoints: { type: 'number' },
+          location: { type: 'string' },
+          attributes: {
+            type: 'object',
+            properties: {
+              strength: { type: 'number' },
+              dexterity: { type: 'number' },
+              constitution: { type: 'number' },
+              intelligence: { type: 'number' },
+              wisdom: { type: 'number' },
+              charisma: { type: 'number' },
+            }
+          }
+        },
+        required: [],
+        additionalProperties: true,
+      },
+      async execute(args: any) {
+        const newState = { ...gameState.value };
+        
+        if (args.name) newState.character.name = args.name;
+        if (args.level) newState.character.level = args.level;
+        if (args.hitPoints !== undefined) newState.character.hitPoints = args.hitPoints;
+        if (args.maxHitPoints) newState.character.maxHitPoints = args.maxHitPoints;
+        if (args.location) newState.character.currentLocation = args.location;
+        if (args.attributes) {
+          newState.character.attributes = { ...newState.character.attributes, ...args.attributes };
+        }
+        
+        gameState.value = newState;
+        return `Character updated: ${newState.character.name} (Level ${newState.character.level}) - HP: ${newState.character.hitPoints}/${newState.character.maxHitPoints}`;
+      },
+    });
+
+    const updateInventoryTool = tool({
+      name: 'update_inventory',
+      description: 'Add or remove items from character inventory',
+      parameters: z.object({
+        action: z.enum(['add', 'remove']),
+        items: z.array(z.string()),
+      }),
+      async execute(args) {
+        const newState = { ...gameState.value };
+        
+        if (args.action === 'add') {
+          newState.character.inventory.push(...args.items);
+        } else if (args.action === 'remove') {
+          newState.character.inventory = newState.character.inventory.filter(item => !args.items.includes(item));
+        }
+        
+        gameState.value = newState;
+        return `Inventory updated: ${args.action === 'add' ? 'Added' : 'Removed'} ${args.items.join(', ')}. Total items: ${newState.character.inventory.length}`;
+      },
+    });
+
+    const updateSceneTool = tool({
+      name: 'update_scene',
+      description: 'Update the current scene, description, and location',
+      parameters: z.object({
+        scene: z.string(),
+        description: z.string(),
+        location: z.string().optional(),
+      }),
+      async execute(args) {
+        const newState = { ...gameState.value };
+        
+        newState.currentScene = args.scene;
+        newState.sceneDescription = args.description;
+        if (args.location) newState.character.currentLocation = args.location;
+        
+        gameState.value = newState;
+        return `Scene updated: ${args.scene} - ${args.description}`;
+      },
+    });
+
+    const rollDiceTool = tool({
+      name: 'roll_dice',
+      description: 'Roll dice for game mechanics (d4, d6, d8, d10, d12, d20, d100)',
+      parameters: z.object({
+        sides: z.number(),
+        count: z.number().default(1),
+        modifier: z.number().default(0),
+      }),
+      async execute(args) {
+        const rolls = [];
+        for (let i = 0; i < args.count; i++) {
+          rolls.push(Math.floor(Math.random() * args.sides) + 1);
+        }
+        const total = rolls.reduce((sum, roll) => sum + roll, 0) + args.modifier;
+        
+        const rollString = `${args.count}d${args.sides}${args.modifier > 0 ? `+${args.modifier}` : args.modifier < 0 ? `${args.modifier}` : ''}`;
+        const result = `Rolled ${rollString}: [${rolls.join(', ')}] = ${total}`;
+        
+        // Add to game log
+        const newState = { ...gameState.value };
+        newState.gameLog.push(`${new Date().toLocaleTimeString()}: ${result}`);
+        gameState.value = newState;
+        
+        return result;
+      },
+    });
+
+    const manageQuestsTool = tool({
+      name: 'manage_quests',
+      description: 'Add, complete, or update quests',
+      parameters: z.object({
+        action: z.enum(['add', 'complete', 'update']),
+        quest: z.string(),
+        index: z.number().optional(),
+      }),
+      async execute(args) {
+        const newState = { ...gameState.value };
+        
+        if (args.action === 'add') {
+          newState.activeQuests.push(args.quest);
+          return `Quest added: ${args.quest}`;
+        } else if (args.action === 'complete' && args.index !== undefined) {
+          const completed = newState.activeQuests.splice(args.index, 1)[0];
+          return `Quest completed: ${completed}`;
+        } else if (args.action === 'update' && args.index !== undefined) {
+          newState.activeQuests[args.index] = args.quest;
+          return `Quest updated: ${args.quest}`;
+        }
+        
+        gameState.value = newState;
+        return `Quest ${args.action}: ${args.quest}`;
+      },
+    });
+
+    const trackLanguageTool = tool({
+      name: 'track_language',
+      description: 'Track German language learning progress',
+      parameters: z.object({
+        corrections: z.number().optional(),
+        newVocabulary: z.array(z.string()).optional(),
+      }),
+      async execute(args) {
+        const newState = { ...gameState.value };
+        
+        if (args.corrections) {
+          newState.languageCorrections += args.corrections;
+        }
+        if (args.newVocabulary) {
+          newState.vocabularyIntroduced.push(...args.newVocabulary);
+        }
+        
+        gameState.value = newState;
+        return `Language progress updated: ${newState.languageCorrections} corrections, ${newState.vocabularyIntroduced.length} vocabulary words`;
+      },
+    });
+
+    const addGameLogTool = tool({
+      name: 'add_game_log',
+      description: 'Add important events to the game log',
+      parameters: z.object({
+        entry: z.string(),
+      }),
+      async execute(args) {
+        const newState = { ...gameState.value };
+        newState.gameLog.push(`${new Date().toLocaleTimeString()}: ${args.entry}`);
+        gameState.value = newState;
+        return `Log entry added: ${args.entry}`;
+      },
+    });
+
+    return [
+      updateCharacterTool,
+      updateInventoryTool,
+      updateSceneTool,
+      rollDiceTool,
+      manageQuestsTool,
+      trackLanguageTool,
+      addGameLogTool,
+    ];
+  };
 
   const startVoiceChat = async () => {
     if (!IS_BROWSER || isConnecting.value) return;
@@ -116,6 +303,9 @@ export default function VoiceChat(_props: VoiceChatProps) {
       // Follow the EXACT pattern from the docs
       const { RealtimeAgent, RealtimeSession } = await import('@openai/agents/realtime');
       
+      // Create tools using dynamic imports
+      const tools = await createGameStateTools();
+      
       const agent = new RealtimeAgent({
         name: 'Der Spielleiter',
         instructions: `Du bist "Der Spielleiter" - ein deutschsprachiger Dungeonmaster und Deutschlehrer.
@@ -132,13 +322,16 @@ export default function VoiceChat(_props: VoiceChatProps) {
 - Verwalte Regeln, Würfelwürfe und Charakterentwicklung
 - Halte den Erzählfluss aufrecht
 - Reagiere dynamisch auf Spielerentscheidungen
-- Verwende lebendige Beschreibungen der Welt
+- Verwende die bereitgestellten Tools für Zustandsverwaltung
 
-**WICHTIGE HINWEISE:**
-- Beschreibe Würfelwürfe explizit ("Ich würfle für dich: d20 + 3 = 15")
-- Aktualisiere Charakterstatus durch Beschreibung ("Deine Lebenspunkte sinken auf 8")
-- Führe Inventar durch natürliche Beschreibung ("Du findest ein Schwert und steckst es in deinen Rucksack")
-- Tracke Quests durch Erzählung ("Deine neue Aufgabe: Finde den verlorenen Kristall")
+**TOOL-VERWENDUNG (WICHTIG):**
+- Nutze 'update_character' für Name, Level, HP, Attribute, Ort
+- Nutze 'update_inventory' für Gegenstände (add/remove)
+- Nutze 'update_scene' für Schauplätze und Beschreibungen
+- Nutze 'roll_dice' für alle Würfelwürfe
+- Nutze 'manage_quests' für Aufgaben (add/complete/update)
+- Nutze 'track_language' für Sprachlernfortschritt
+- Nutze 'add_game_log' für wichtige Ereignisse
 
 **PÄDAGOGISCHE STRATEGIEN:**
 - Wiederhole wichtige Strukturen natürlich
@@ -161,7 +354,8 @@ export default function VoiceChat(_props: VoiceChatProps) {
 - Unterstützend beim Deutschlernen
 - Humorvoll und einnehmend
 
-Starte mit einer freundlichen Begrüßung und frage nach dem Namen des Charakters. Führe dann durch die Charaktererstellung und beginne das Abenteuer!`,
+Starte mit einer freundlichen Begrüßung und frage nach dem Namen des Charakters. Nutze dann die Tools, um die Charaktererstellung zu verwalten und das Abenteuer zu beginnen!`,
+        tools: tools,
       });
 
       const session = new RealtimeSession(agent, {
