@@ -118,19 +118,35 @@ export default function VoiceChat(_props: VoiceChatProps) {
     const formattedHistory: ConversationItem[] = [];
     
     history.forEach((item: any) => {
-      if (item.type === 'message') {
-        // Extract text content from the message
+      if (item.type === 'message' && item.status === 'completed') {
         let content = '';
-        if (item.content && Array.isArray(item.content)) {
-          // Handle content array format
+        
+        // Handle user messages with input_audio transcript
+        if (item.role === 'user' && item.content && Array.isArray(item.content)) {
           item.content.forEach((part: any) => {
-            if (part.type === 'text' && part.text) {
-              content += part.text;
+            if (part.type === 'input_audio' && part.transcript) {
+              content += part.transcript;
             } else if (part.type === 'input_text' && part.text) {
+              content += part.text;
+            } else if (part.type === 'text' && part.text) {
               content += part.text;
             }
           });
-        } else if (typeof item.content === 'string') {
+        }
+        
+        // Handle assistant messages
+        else if (item.role === 'assistant' && item.content && Array.isArray(item.content)) {
+          item.content.forEach((part: any) => {
+            if (part.type === 'audio' && part.transcript) {
+              content += part.transcript;
+            } else if (part.type === 'text' && part.text) {
+              content += part.text;
+            }
+          });
+        }
+        
+        // Handle direct string content (fallback)
+        else if (typeof item.content === 'string') {
           content = item.content;
         }
         
@@ -142,27 +158,16 @@ export default function VoiceChat(_props: VoiceChatProps) {
             type: 'message'
           });
         }
-      } else if (item.type === 'response' && item.output) {
-        // Handle assistant responses
-        let content = '';
-        if (Array.isArray(item.output)) {
-          item.output.forEach((outputItem: any) => {
-            if (outputItem.type === 'audio' && outputItem.transcript) {
-              content += outputItem.transcript;
-            } else if (outputItem.type === 'text' && outputItem.text) {
-              content += outputItem.text;
-            }
-          });
-        }
-        
-        if (content.trim()) {
-          formattedHistory.push({
-            timestamp: new Date().toLocaleTimeString(),
-            role: 'assistant',
-            content: content.trim(),
-            type: 'message'
-          });
-        }
+      }
+      
+      // Also show function calls in the conversation for transparency
+      else if (item.type === 'function_call' && item.status === 'completed') {
+        formattedHistory.push({
+          timestamp: new Date().toLocaleTimeString(),
+          role: 'assistant',
+          content: `🔧 Called tool: ${item.name}(${item.arguments}) → ${item.output}`,
+          type: 'message'
+        });
       }
     });
     
