@@ -234,9 +234,10 @@ Starte mit einer freundlichen Begrüßung und frage nach dem Namen des Charakter
                 tools: tools,
               });
 
-              // Create session
-              console.log('Creating RealtimeSession...');
+              // Create session with WebSocket transport (for server-side use)
+              console.log('Creating RealtimeSession with WebSocket transport...');
               realtimeSession = new RealtimeSession(agent, {
+                transport: 'websocket',
                 model: 'gpt-4o-realtime-preview-2025-06-03',
                 config: {
                   inputAudioTranscription: {
@@ -277,12 +278,12 @@ Starte mit einer freundlichen Begrüßung und frage nach dem Namen des Charakter
                 }));
               });
 
-              // Connect to OpenAI
-              console.log('Connecting to OpenAI Realtime API...');
+              // Connect to OpenAI using WebSocket transport
+              console.log('Connecting to OpenAI Realtime API via WebSocket...');
               await realtimeSession.connect({
                 apiKey: message.clientApiKey,
               });
-              console.log('Successfully connected to OpenAI Realtime API');
+              console.log('Successfully connected to OpenAI Realtime API via WebSocket');
 
               if (sessionId) {
                 sessions.set(sessionId, realtimeSession);
@@ -321,29 +322,18 @@ Starte mit einer freundlichen Begrüßung und frage nach dem Namen des Charakter
             }
 
             try {
-              // For now, let's just log that we received audio without processing it
-              // The actual RealtimeSession setup might be failing
               console.log('Audio chunk received, length:', message.audio.length);
               
-              // Check what methods are available on the realtimeSession
-              console.log('RealtimeSession methods:', Object.getOwnPropertyNames(realtimeSession));
+              // NOTE: The browser is sending WebM audio as base64, but OpenAI Realtime WebSocket 
+              // transport expects PCM16 audio as ArrayBuffer. We need to convert the audio format.
+              // For now, let's just acknowledge receipt without processing.
               
-              // Try to send audio if the method exists
-              if (typeof realtimeSession.sendAudio === 'function') {
-                const binaryString = atob(message.audio);
-                const audioBuffer = new Uint8Array(binaryString.length);
-                for (let i = 0; i < binaryString.length; i++) {
-                  audioBuffer[i] = binaryString.charCodeAt(i);
-                }
-                await realtimeSession.sendAudio(audioBuffer.buffer);
-                console.log('Audio sent successfully via sendAudio');
-              } else {
-                console.error('sendAudio method not available on RealtimeSession');
-                socket.send(JSON.stringify({ 
-                  type: 'error', 
-                  error: 'Audio processing method not available' 
-                }));
-              }
+              console.warn('Audio format conversion needed: WebM -> PCM16');
+              console.log('Skipping audio processing until format conversion is implemented');
+              
+              // TODO: Convert WebM audio to PCM16 format
+              // This requires audio decoding libraries or changing the client audio capture
+              
             } catch (error) {
               console.error('Error processing audio:', error);
               const errorMessage = error instanceof Error ? error.message : String(error);
