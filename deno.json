@@ -29,8 +29,7 @@
     "$std/": "https://deno.land/std@0.216.0/",
     "zod": "https://esm.sh/zod@3.25.76",
     "@openai/zod/v3": "https://esm.sh/zod@3.25.76",
-    "@openai/agents": "npm:@openai/agents@latest",
-    "@openai/agents/realtime": "npm:@openai/agents@latest/realtime",
+    "@openai/agents-realtime": "npm:@openai/agents-realtime@latest",
     "openai": "npm:openai@^4.62.1"
   },
   "compilerOptions": {

@@ -196,7 +196,7 @@ export default function VoiceChat(_props: VoiceChatProps) {
 
   // Create game state management tools using dynamic imports
   const createGameStateTools = async () => {
-    const { tool } = await import('@openai/agents');
+    const { tool } = await import('@openai/agents-realtime');
 
     const updateCharacterTool = tool({
       name: 'update_character',
@@ -474,7 +474,7 @@ export default function VoiceChat(_props: VoiceChatProps) {
       status.value = "Connecting to OpenAI...";
       
       // Follow the EXACT pattern from the docs
-      const { RealtimeAgent, RealtimeSession } = await import('@openai/agents/realtime');
+      const { RealtimeAgent, RealtimeSession } = await import('@openai/agents-realtime');
       
       // Create tools using dynamic imports
       const tools = await createGameStateTools();
