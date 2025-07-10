@@ -322,20 +322,31 @@ Starte mit einer freundlichen Begrüßung und frage nach dem Namen des Charakter
             }
 
             try {
-              console.log('Audio chunk received, length:', message.audio.length);
+              console.log('PCM16 audio chunk received, length:', message.audio.length);
               
-              // NOTE: The browser is sending WebM audio as base64, but OpenAI Realtime WebSocket 
-              // transport expects PCM16 audio as ArrayBuffer. We need to convert the audio format.
-              // For now, let's just acknowledge receipt without processing.
+              // Convert base64 back to ArrayBuffer (PCM16 format)
+              const binaryString = atob(message.audio);
+              const arrayBuffer = new ArrayBuffer(binaryString.length);
+              const view = new Uint8Array(arrayBuffer);
               
-              console.warn('Audio format conversion needed: WebM -> PCM16');
-              console.log('Skipping audio processing until format conversion is implemented');
+              for (let i = 0; i < binaryString.length; i++) {
+                view[i] = binaryString.charCodeAt(i);
+              }
               
-              // TODO: Convert WebM audio to PCM16 format
-              // This requires audio decoding libraries or changing the client audio capture
+              // Send PCM16 audio to OpenAI Realtime API
+              if (typeof realtimeSession.sendAudio === 'function') {
+                await realtimeSession.sendAudio(arrayBuffer);
+                console.log('PCM16 audio sent to OpenAI successfully');
+              } else {
+                console.error('sendAudio method not available on RealtimeSession');
+                socket.send(JSON.stringify({ 
+                  type: 'error', 
+                  error: 'sendAudio method not available' 
+                }));
+              }
               
             } catch (error) {
-              console.error('Error processing audio:', error);
+              console.error('Error processing PCM16 audio:', error);
               const errorMessage = error instanceof Error ? error.message : String(error);
               socket.send(JSON.stringify({ 
                 type: 'error', 

@@ -285,7 +285,7 @@ export default function VoiceChat(_props: VoiceChatProps) {
     };
   };
 
-  // Start capturing audio from the microphone
+  // Start capturing raw PCM16 audio from the microphone
   const startAudioCapture = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ 
@@ -297,32 +297,46 @@ export default function VoiceChat(_props: VoiceChatProps) {
         } 
       });
 
+      // Create audio context for raw audio processing
       audioContextRef.current = new AudioContext({ sampleRate: 24000 });
-      const mediaRecorder = new MediaRecorder(stream, {
-        mimeType: 'audio/webm',
-      });
+      const source = audioContextRef.current.createMediaStreamSource(stream);
       
-      mediaRecorderRef.current = mediaRecorder;
-
-      mediaRecorder.ondataavailable = async (event) => {
-        if (event.data.size > 0 && wsRef.current?.readyState === WebSocket.OPEN) {
-          // Convert blob to base64 and send to server
-          const reader = new FileReader();
-          reader.onload = () => {
-            const base64Audio = reader.result?.toString().split(',')[1];
-            if (base64Audio) {
-              wsRef.current?.send(JSON.stringify({
-                type: 'audio',
-                audio: base64Audio
-              }));
-            }
-          };
-          reader.readAsDataURL(event.data);
+      // Create a ScriptProcessorNode to capture raw audio data
+      const bufferSize = 4096;
+      const processor = audioContextRef.current.createScriptProcessor(bufferSize, 1, 1);
+      
+      processor.onaudioprocess = (event) => {
+        if (wsRef.current?.readyState === WebSocket.OPEN) {
+          const inputBuffer = event.inputBuffer;
+          const inputData = inputBuffer.getChannelData(0);
+          
+          // Convert Float32Array to PCM16
+          const pcm16Buffer = new Int16Array(inputData.length);
+          for (let i = 0; i < inputData.length; i++) {
+            // Convert from [-1, 1] float to [-32768, 32767] int16
+            const sample = Math.max(-1, Math.min(1, inputData[i]));
+            pcm16Buffer[i] = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+          }
+          
+          // Convert to base64 for transmission
+          const arrayBuffer = pcm16Buffer.buffer;
+          const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+          
+          wsRef.current.send(JSON.stringify({
+            type: 'audio',
+            audio: base64
+          }));
         }
       };
-
-      // Start recording in chunks
-      mediaRecorder.start(100); // Send chunks every 100ms
+      
+      // Connect the audio processing chain
+      source.connect(processor);
+      processor.connect(audioContextRef.current.destination);
+      
+      // Store the processor for cleanup
+      mediaRecorderRef.current = processor as any;
+      
+      console.log('Started PCM16 audio capture');
     } catch (error) {
       console.error('Error starting audio capture:', error);
       status.value = "Error accessing microphone";
@@ -331,13 +345,22 @@ export default function VoiceChat(_props: VoiceChatProps) {
 
   // Stop audio capture
   const stopAudioCapture = () => {
-    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-      mediaRecorderRef.current.stop();
-      mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+    // Disconnect the audio processor
+    if (mediaRecorderRef.current) {
+      try {
+        (mediaRecorderRef.current as any).disconnect();
+        console.log('Audio processor disconnected');
+      } catch (error) {
+        console.error('Error disconnecting audio processor:', error);
+      }
+      mediaRecorderRef.current = null;
     }
+    
+    // Close audio context
     if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
       audioContextRef.current.close();
       audioContextRef.current = null;
+      console.log('Audio context closed');
     }
   };
 
