@@ -1,0 +1,1 @@
+Keep things as simple as possible. Make the minimal code edits needed. Optimize for speed of iteration and testing quickly instead of doing big refactors. Plan out anything non-trivial meticulously.

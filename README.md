@@ -94,3 +94,62 @@ Deploy to Deno Deploy:
 ## License
 
 MIT License - feel free to use this project for your own applications!
+
+# fresh project
+
+### Usage
+
+Make sure to install Deno: https://deno.land/manual/getting_started/installation
+
+Then start the project:
+
+```
+deno task start
+```
+
+This will watch the project directory and restart as necessary.
+
+## Realtime Voice Chat
+
+This project now includes a realtime voice chat feature powered by OpenAI's Realtime API. Here's how to use it:
+
+### Setup
+
+1. **Get an OpenAI API Key**: You'll need an OpenAI API key with access to the Realtime API.
+
+2. **Set Environment Variable**: 
+   ```bash
+   export OPENAI_API_KEY=your-api-key-here
+   ```
+
+3. **Start the Server**: 
+   ```bash
+   deno task start
+   ```
+
+4. **Open in Browser**: Navigate to `http://localhost:8000`
+
+### How It Works
+
+- **Click the 🎙️ button** to start a voice session
+- **Allow microphone access** when prompted
+- **Start speaking** - the AI will respond in real-time
+- **Click the 🔴 button** to stop the session
+
+### Features
+
+- **True realtime conversation** - No waiting for speech-to-text processing
+- **Voice activity detection** - Automatically detects when you start and stop speaking
+- **Real-time audio playback** - Hear the AI's response as it's generated
+- **WebSocket connection** - Direct connection to OpenAI's Realtime API
+- **Audio processing** - Automatic echo cancellation and noise suppression
+
+### Technical Details
+
+The implementation uses:
+- **WebSocket connection** to OpenAI's Realtime API
+- **MediaRecorder API** for capturing audio
+- **Real-time audio streaming** in base64 format
+- **Server-side Voice Activity Detection (VAD)** for natural conversations
+
+No additional dependencies required - everything works directly in the browser!

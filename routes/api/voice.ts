@@ -1,5 +1,4 @@
 import { Handlers } from "$fresh/server.ts";
-import { RealtimeAgent, RealtimeSession } from "@openai/agents/realtime";
 
 interface VoiceRequest {
   action: string;
@@ -23,29 +22,22 @@ export const handler: Handlers = {
 
       const body: VoiceRequest = await req.json();
       
+      if (body.action === "get_session_config") {
+        // Return the API key and configuration for the frontend
+        return new Response(
+          JSON.stringify({ 
+            apiKey: apiKey,
+            status: "ready"
+          }),
+          {
+            status: 200,
+            headers: { "Content-Type": "application/json" }
+          }
+        );
+      }
+      
       if (body.action === "start") {
-        // Create a new realtime agent
-        const agent = new RealtimeAgent({
-          name: "Voice Assistant",
-          instructions: `You are a helpful voice assistant. Keep your responses:
-- Natural and conversational
-- Friendly and engaging
-- Concise but informative
-- Appropriate for voice interaction
-- Easy to understand when spoken aloud`,
-          model: "gpt-4o-realtime-preview-2024-10-01",
-          voice: "alloy",
-          temperature: 0.7,
-        });
-
-        // Create a new realtime session
-        const session = new RealtimeSession(agent);
-        
-        // Connect to OpenAI Realtime API
-        await session.connect({
-          apiKey,
-        });
-
+        // Legacy action for backward compatibility
         return new Response(
           JSON.stringify({ 
             status: "connected",
