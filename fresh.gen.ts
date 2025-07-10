@@ -6,6 +6,7 @@ import * as $_404 from "./routes/_404.tsx";
 import * as $_app from "./routes/_app.tsx";
 import * as $api_joke from "./routes/api/joke.ts";
 import * as $api_voice from "./routes/api/voice.ts";
+import * as $api_ws_realtime from "./routes/api/ws/realtime.ts";
 import * as $greet_name_ from "./routes/greet/[name].tsx";
 import * as $index from "./routes/index.tsx";
 import * as $Counter from "./islands/Counter.tsx";
@@ -18,6 +19,7 @@ const manifest = {
     "./routes/_app.tsx": $_app,
     "./routes/api/joke.ts": $api_joke,
     "./routes/api/voice.ts": $api_voice,
+    "./routes/api/ws/realtime.ts": $api_ws_realtime,
     "./routes/greet/[name].tsx": $greet_name_,
     "./routes/index.tsx": $index,
   },

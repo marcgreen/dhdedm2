@@ -53,7 +53,9 @@ export default function VoiceChat(_props: VoiceChatProps) {
   const isConnected = useSignal(false);
   const isConnecting = useSignal(false);
   const status = useSignal("Ready to start");
-  const sessionRef = useRef<any>(null);
+  const wsRef = useRef<WebSocket | null>(null);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
   const gameState = useSignal<GameState>({
     character: {
       name: "",
@@ -194,253 +196,162 @@ export default function VoiceChat(_props: VoiceChatProps) {
     gameState.value = newState;
   };
 
-  // Create game state management tools using dynamic imports
-  const createGameStateTools = async () => {
-    const { tool } = await import('@openai/agents-realtime');
+  // Set up WebSocket connection
+  const setupWebSocket = (clientApiKey: string) => {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/api/ws/realtime`;
+    
+    const ws = new WebSocket(wsUrl);
+    wsRef.current = ws;
 
-    const updateCharacterTool = tool({
-      name: 'update_character',
-      description: 'Update character information including name, level, HP, attributes, and location',
-      strict: false,
-      parameters: {
-        type: 'object',
-        properties: {
-          name: { type: 'string' },
-          level: { type: 'number' },
-          hitPoints: { type: 'number' },
-          maxHitPoints: { type: 'number' },
-          location: { type: 'string' },
-          attributes: {
-            type: 'object',
-            properties: {
-              strength: { type: 'number' },
-              dexterity: { type: 'number' },
-              constitution: { type: 'number' },
-              intelligence: { type: 'number' },
-              wisdom: { type: 'number' },
-              charisma: { type: 'number' },
-            }
+    ws.onopen = () => {
+      console.log('WebSocket connected');
+      // Send connect message with API key
+      ws.send(JSON.stringify({
+        type: 'connect',
+        clientApiKey: clientApiKey
+      }));
+    };
+
+    ws.onmessage = (event) => {
+      const message = JSON.parse(event.data);
+      
+      switch (message.type) {
+        case 'connected':
+          isConnected.value = true;
+          isConnecting.value = false;
+          status.value = "Mit Der Spielleiter verbunden - Sprich jetzt!";
+          gameState.value = { ...gameState.value, sessionId: message.sessionId };
+          // Start recording audio
+          startAudioCapture();
+          break;
+          
+        case 'history_updated':
+          updateConversationHistory(message.history);
+          break;
+          
+        case 'audio':
+          // Play received audio
+          playAudio(message.audio);
+          break;
+          
+        case 'tool_executed':
+          // Handle tool execution results
+          if (message.result) {
+            const toolName = message.result.name || 'unknown';
+            const params = message.result.parameters || {};
+            const output = message.result.output || '';
+            logToolCall(toolName, params, output);
           }
-        },
-        required: [],
-        additionalProperties: true,
-      },
-      async execute(args: any) {
-        const newState = { ...gameState.value };
-        
-        if (args.name) newState.character.name = args.name;
-        if (args.level) newState.character.level = args.level;
-        if (args.hitPoints !== undefined) newState.character.hitPoints = args.hitPoints;
-        if (args.maxHitPoints) newState.character.maxHitPoints = args.maxHitPoints;
-        if (args.location) newState.character.currentLocation = args.location;
-        if (args.attributes) {
-          newState.character.attributes = { ...newState.character.attributes, ...args.attributes };
+          break;
+          
+        case 'error':
+          console.error('WebSocket error:', message.error);
+          status.value = `Error: ${message.error}`;
+          break;
+          
+        case 'disconnected':
+          isConnected.value = false;
+          status.value = "Disconnected";
+          stopAudioCapture();
+          break;
+      }
+    };
+
+    ws.onerror = (error) => {
+      console.error('WebSocket error:', error);
+      status.value = "Connection error";
+      isConnected.value = false;
+      isConnecting.value = false;
+    };
+
+    ws.onclose = () => {
+      console.log('WebSocket closed');
+      isConnected.value = false;
+      isConnecting.value = false;
+      status.value = "Ready to start";
+      stopAudioCapture();
+    };
+  };
+
+  // Start capturing audio from the microphone
+  const startAudioCapture = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        audio: {
+          channelCount: 1,
+          sampleRate: 24000,
+          echoCancellation: true,
+          noiseSuppression: true,
+        } 
+      });
+
+      audioContextRef.current = new AudioContext({ sampleRate: 24000 });
+      const mediaRecorder = new MediaRecorder(stream, {
+        mimeType: 'audio/webm',
+      });
+      
+      mediaRecorderRef.current = mediaRecorder;
+
+      mediaRecorder.ondataavailable = async (event) => {
+        if (event.data.size > 0 && wsRef.current?.readyState === WebSocket.OPEN) {
+          // Convert blob to base64 and send to server
+          const reader = new FileReader();
+          reader.onload = () => {
+            const base64Audio = reader.result?.toString().split(',')[1];
+            if (base64Audio) {
+              wsRef.current?.send(JSON.stringify({
+                type: 'audio',
+                audio: base64Audio
+              }));
+            }
+          };
+          reader.readAsDataURL(event.data);
         }
-        
-        gameState.value = newState;
-        const result = `Character updated: ${newState.character.name} (Level ${newState.character.level}) - HP: ${newState.character.hitPoints}/${newState.character.maxHitPoints}`;
-        
-        logToolCall('update_character', args, result);
-        return result;
-      },
-    });
+      };
 
-    const updateInventoryTool = tool({
-      name: 'update_inventory',
-      description: 'Add or remove items from character inventory',
-      strict: false,
-      parameters: {
-        type: 'object',
-        properties: {
-          action: { type: 'string', enum: ['add', 'remove'] },
-          items: { type: 'array', items: { type: 'string' } },
-        },
-        required: ['action', 'items'],
-        additionalProperties: true,
-      },
-      async execute(args: any) {
-        const newState = { ...gameState.value };
-        
-        if (args.action === 'add') {
-          newState.character.inventory.push(...args.items);
-        } else if (args.action === 'remove') {
-          newState.character.inventory = newState.character.inventory.filter(item => !args.items.includes(item));
-        }
-        
-        gameState.value = newState;
-        const result = `Inventory updated: ${args.action === 'add' ? 'Added' : 'Removed'} ${args.items.join(', ')}. Total items: ${newState.character.inventory.length}`;
-        
-        logToolCall('update_inventory', args, result);
-        return result;
-      },
-    });
+      // Start recording in chunks
+      mediaRecorder.start(100); // Send chunks every 100ms
+    } catch (error) {
+      console.error('Error starting audio capture:', error);
+      status.value = "Error accessing microphone";
+    }
+  };
 
-    const updateSceneTool = tool({
-      name: 'update_scene',
-      description: 'Update the current scene, description, and location',
-      strict: false,
-      parameters: {
-        type: 'object',
-        properties: {
-          scene: { type: 'string' },
-          description: { type: 'string' },
-          location: { type: 'string' },
-        },
-        required: ['scene', 'description'],
-        additionalProperties: true,
-      },
-      async execute(args: any) {
-        const newState = { ...gameState.value };
-        
-        newState.currentScene = args.scene;
-        newState.sceneDescription = args.description;
-        if (args.location) newState.character.currentLocation = args.location;
-        
-        gameState.value = newState;
-        const result = `Scene updated: ${args.scene} - ${args.description}`;
-        
-        logToolCall('update_scene', args, result);
-        return result;
-      },
-    });
+  // Stop audio capture
+  const stopAudioCapture = () => {
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
+      mediaRecorderRef.current.stop();
+      mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
+    }
+    if (audioContextRef.current) {
+      audioContextRef.current.close();
+    }
+  };
 
-    const rollDiceTool = tool({
-      name: 'roll_dice',
-      description: 'Roll dice for game mechanics (d4, d6, d8, d10, d12, d20, d100)',
-      strict: false,
-      parameters: {
-        type: 'object',
-        properties: {
-          sides: { type: 'number' },
-          count: { type: 'number', default: 1 },
-          modifier: { type: 'number', default: 0 },
-        },
-        required: ['sides'],
-        additionalProperties: true,
-      },
-      async execute(args: any) {
-        const rolls = [];
-        const count = args.count || 1;
-        const modifier = args.modifier || 0;
-        
-        for (let i = 0; i < count; i++) {
-          rolls.push(Math.floor(Math.random() * args.sides) + 1);
-        }
-        const total = rolls.reduce((sum, roll) => sum + roll, 0) + modifier;
-        
-        const rollString = `${count}d${args.sides}${modifier > 0 ? `+${modifier}` : modifier < 0 ? `${modifier}` : ''}`;
-        const result = `Rolled ${rollString}: [${rolls.join(', ')}] = ${total}`;
-        
-        // Add to game log (for important rolls)
-        const newState = { ...gameState.value };
-        newState.gameLog.push(`${new Date().toLocaleTimeString()}: ${result}`);
-        gameState.value = newState;
-        
-        logToolCall('roll_dice', args, result);
-        return result;
-      },
-    });
-
-    const manageQuestsTool = tool({
-      name: 'manage_quests',
-      description: 'Add, complete, or update quests',
-      strict: false,
-      parameters: {
-        type: 'object',
-        properties: {
-          action: { type: 'string', enum: ['add', 'complete', 'update'] },
-          quest: { type: 'string' },
-          index: { type: 'number' },
-        },
-        required: ['action', 'quest'],
-        additionalProperties: true,
-      },
-      async execute(args: any) {
-        const newState = { ...gameState.value };
-        let result = '';
-        
-        if (args.action === 'add') {
-          newState.activeQuests.push(args.quest);
-          result = `Quest added: ${args.quest}`;
-        } else if (args.action === 'complete' && args.index !== undefined) {
-          const completed = newState.activeQuests.splice(args.index, 1)[0];
-          result = `Quest completed: ${completed}`;
-        } else if (args.action === 'update' && args.index !== undefined) {
-          newState.activeQuests[args.index] = args.quest;
-          result = `Quest updated: ${args.quest}`;
-        } else {
-          result = `Quest ${args.action}: ${args.quest}`;
-        }
-        
-        gameState.value = newState;
-        logToolCall('manage_quests', args, result);
-        return result;
-      },
-    });
-
-    const trackLanguageTool = tool({
-      name: 'track_language',
-      description: 'Track German language learning progress',
-      strict: false,
-      parameters: {
-        type: 'object',
-        properties: {
-          corrections: { type: 'number' },
-          newVocabulary: { type: 'array', items: { type: 'string' } },
-        },
-        required: [],
-        additionalProperties: true,
-      },
-      async execute(args: any) {
-        const newState = { ...gameState.value };
-        
-        if (args.corrections) {
-          newState.languageCorrections += args.corrections;
-        }
-        if (args.newVocabulary) {
-          newState.vocabularyIntroduced.push(...args.newVocabulary);
-        }
-        
-        gameState.value = newState;
-        const result = `Language progress updated: ${newState.languageCorrections} corrections, ${newState.vocabularyIntroduced.length} vocabulary words`;
-        
-        logToolCall('track_language', args, result);
-        return result;
-      },
-    });
-
-    const addGameLogTool = tool({
-      name: 'add_game_log',
-      description: 'Add important events to the game log',
-      strict: false,
-      parameters: {
-        type: 'object',
-        properties: {
-          entry: { type: 'string' },
-        },
-        required: ['entry'],
-        additionalProperties: true,
-      },
-      async execute(args: any) {
-        const newState = { ...gameState.value };
-        newState.gameLog.push(`${new Date().toLocaleTimeString()}: ${args.entry}`);
-        gameState.value = newState;
-        const result = `Log entry added: ${args.entry}`;
-        
-        logToolCall('add_game_log', args, result);
-        return result;
-      },
-    });
-
-    return [
-      updateCharacterTool,
-      updateInventoryTool,
-      updateSceneTool,
-      rollDiceTool,
-      manageQuestsTool,
-      trackLanguageTool,
-      addGameLogTool,
-    ];
+  // Play received audio
+  const playAudio = async (base64Audio: string) => {
+    try {
+      if (!audioContextRef.current) {
+        audioContextRef.current = new AudioContext();
+      }
+      
+      const audioData = atob(base64Audio);
+      const arrayBuffer = new ArrayBuffer(audioData.length);
+      const view = new Uint8Array(arrayBuffer);
+      
+      for (let i = 0; i < audioData.length; i++) {
+        view[i] = audioData.charCodeAt(i);
+      }
+      
+      const audioBuffer = await audioContextRef.current.decodeAudioData(arrayBuffer);
+      const source = audioContextRef.current.createBufferSource();
+      source.buffer = audioBuffer;
+      source.connect(audioContextRef.current.destination);
+      source.start();
+    } catch (error) {
+      console.error('Error playing audio:', error);
+    }
   };
 
   const startVoiceChat = async () => {
@@ -473,90 +384,8 @@ export default function VoiceChat(_props: VoiceChatProps) {
       
       status.value = "Connecting to OpenAI...";
       
-      // Follow the EXACT pattern from the docs
-      const { RealtimeAgent, RealtimeSession } = await import('@openai/agents-realtime');
-      
-      // Create tools using dynamic imports
-      const tools = await createGameStateTools();
-      
-      const agent = new RealtimeAgent({
-        name: 'Der Spielleiter',
-        instructions: `Du bist "Der Spielleiter" - ein deutschsprachiger Dungeonmaster und Deutschlehrer.
-
-**SPRACHREGELN (ABSOLUT WICHTIG):**
-- Sprich NUR auf Deutsch (B1-B2 Niveau)
-- Verwende Wortschatz für Fortgeschrittene (ca. 2000-4000 Wörter)
-- Korrigiere Fehler sanft im Spielkontext
-- Führe neues Vokabular natürlich ein
-- Ermutige beschreibende Sprache zum Üben
-
-**SPIELLEITER-ROLLE:**
-- Erstelle fesselnde Fantasy-Szenarien
-- Verwalte Regeln, Würfelwürfe und Charakterentwicklung
-- Halte den Erzählfluss aufrecht
-- Reagiere dynamisch auf Spielerentscheidungen
-- Verwende die bereitgestellten Tools für Zustandsverwaltung
-
-**TOOL-VERWENDUNG (WICHTIG):**
-- Nutze 'update_character' für Name, Level, HP, Attribute, Ort
-- Nutze 'update_inventory' für Gegenstände (add/remove)
-- Nutze 'update_scene' für Schauplätze und Beschreibungen
-- Nutze 'roll_dice' für alle Würfelwürfe
-- Nutze 'manage_quests' für Aufgaben (add/complete/update)
-- Nutze 'track_language' für Sprachlernfortschritt
-- Nutze 'add_game_log' für wichtige Ereignisse
-
-**PÄDAGOGISCHE STRATEGIEN:**
-- Wiederhole wichtige Strukturien natürlich
-- Verwende Scaffolding (Gerüst) für komplexe Konzepte
-- Gib konstruktives Feedback
-- Passe die Komplexität an das Verständnis an
-- Nutze das Spiel für Sprachenlernen
-
-**SPIELMECHANIK:**
-- Beginne mit Charaktererstellung
-- Verwende d20-System für Aktionen
-- Verwalte Lebenspunkte, Inventar und Quests
-- Erstelle lebendige Beschreibungen der Welt
-- Belohne kreative Problemlösung
-
-**PERSÖNLICHKEIT:**
-- Freundlich aber herausfordernd
-- Geduldig mit Sprachfehlern
-- Enthusiastisch für Fantasy-Abenteuer
-- Unterstützend beim Deutschlernen
-- Humorvoll und einnehmend
-
-Starte mit einer freundlichen Begrüßung und frage nach dem Namen des Charakters. Nutze dann die Tools, um die Charaktererstellung zu verwalten und das Abenteuer zu beginnen!`,
-        tools: tools,
-      });
-
-      const session = new RealtimeSession(agent, {
-        model: 'gpt-4o-realtime-preview-2025-06-03',
-        config: {
-          inputAudioTranscription: {
-            model: 'gpt-4o-mini-transcribe',
-          },
-        },
-      });
-      
-      sessionRef.current = session;
-      
-      // Set up conversation history tracking
-      session.on('history_updated', (history) => {
-        console.log('History updated:', history);
-        updateConversationHistory(history);
-      });
-      
-      // Connect using the ephemeral client token (secure for browser)
-      await session.connect({
-        apiKey: config.clientApiKey,
-      });
-      
-      isConnected.value = true;
-      isConnecting.value = false;
-      status.value = "Mit Der Spielleiter verbunden - Sprich jetzt!";
-      console.log('Voice session connected successfully with ephemeral token');
+      // Set up WebSocket connection
+      setupWebSocket(config.clientApiKey);
       
     } catch (error) {
       console.error('Voice chat error:', error);
@@ -570,29 +399,12 @@ Starte mit einer freundlichen Begrüßung und frage nach dem Namen des Charakter
     if (!IS_BROWSER) return;
     
     try {
-      if (sessionRef.current) {
-        // Try different common methods for stopping the session
-        console.log('Available methods on session:', Object.getOwnPropertyNames(sessionRef.current));
-        
-        if (typeof sessionRef.current.close === 'function') {
-          await sessionRef.current.close();
-          console.log('Session closed using close()');
-        } else if (typeof sessionRef.current.stop === 'function') {
-          await sessionRef.current.stop();
-          console.log('Session stopped using stop()');
-        } else if (typeof sessionRef.current.end === 'function') {
-          await sessionRef.current.end();
-          console.log('Session ended using end()');
-        } else if (typeof sessionRef.current.destroy === 'function') {
-          sessionRef.current.destroy();
-          console.log('Session destroyed using destroy()');
-        } else {
-          console.log('No explicit disconnect method found, setting to null');
-        }
-        
-        sessionRef.current = null;
+      if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {
+        wsRef.current.send(JSON.stringify({ type: 'disconnect' }));
+        wsRef.current.close();
       }
       
+      stopAudioCapture();
       isConnected.value = false;
       isConnecting.value = false;
       status.value = "Ready to start";
@@ -602,7 +414,7 @@ Starte mit einer freundlichen Begrüßung und frage nach dem Namen des Charakter
       // Still reset the state even if there's an error
       isConnected.value = false;
       isConnecting.value = false;
-      sessionRef.current = null;
+      wsRef.current = null;
     }
   };
 
