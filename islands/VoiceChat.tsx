@@ -214,9 +214,10 @@ export default function VoiceChat(_props: VoiceChatProps) {
     };
 
     ws.onmessage = (event) => {
-      const message = JSON.parse(event.data);
-      
-      switch (message.type) {
+      try {
+        const message = JSON.parse(event.data);
+        
+        switch (message.type) {
         case 'connected':
           isConnected.value = true;
           isConnecting.value = false;
@@ -248,6 +249,8 @@ export default function VoiceChat(_props: VoiceChatProps) {
         case 'error':
           console.error('WebSocket error:', message.error);
           status.value = `Error: ${message.error}`;
+          isConnected.value = false;
+          isConnecting.value = false;
           break;
           
         case 'disconnected':
@@ -255,11 +258,18 @@ export default function VoiceChat(_props: VoiceChatProps) {
           status.value = "Disconnected";
           stopAudioCapture();
           break;
+        
+        default:
+          console.warn('Unknown message type:', message.type, message);
       }
-    };
+    } catch (error) {
+      console.error('Error parsing WebSocket message:', error, event.data);
+      status.value = "WebSocket message error";
+    }
+  };
 
     ws.onerror = (error) => {
-      console.error('WebSocket error:', error);
+      console.error('WebSocket connection error:', error);
       status.value = "Connection error";
       isConnected.value = false;
       isConnecting.value = false;
@@ -324,8 +334,9 @@ export default function VoiceChat(_props: VoiceChatProps) {
       mediaRecorderRef.current.stop();
       mediaRecorderRef.current.stream.getTracks().forEach(track => track.stop());
     }
-    if (audioContextRef.current) {
+    if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
       audioContextRef.current.close();
+      audioContextRef.current = null;
     }
   };
 

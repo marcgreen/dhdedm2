@@ -184,6 +184,7 @@ export const handler: Handlers = {
     socket.onmessage = async (event) => {
       try {
         const message = JSON.parse(event.data);
+        console.log('Received WebSocket message:', message.type);
         
         switch (message.type) {
           case 'connect':
@@ -287,9 +288,11 @@ Starte mit einer freundlichen Begrüßung und frage nach dem Namen des Charakter
 
                          } catch (error) {
               console.error('Failed to create session:', error);
+              const errorMessage = error instanceof Error ? error.message : String(error);
+              console.error('Error details:', errorMessage);
               socket.send(JSON.stringify({ 
                 type: 'error', 
-                error: `Failed to create session: ${error instanceof Error ? error.message : String(error)}` 
+                error: `Failed to create session: ${errorMessage}` 
               }));
             }
             break;
