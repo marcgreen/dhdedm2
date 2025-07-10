@@ -118,11 +118,11 @@ export default function VoiceChat(_props: VoiceChatProps) {
     const formattedHistory: ConversationItem[] = [];
     
     history.forEach((item: any) => {
-      if (item.type === 'message' && item.status === 'completed') {
+      if (item.type === 'message') {
         let content = '';
         
-        // Handle user messages with input_audio transcript
-        if (item.role === 'user' && item.content && Array.isArray(item.content)) {
+        // Handle user messages with input_audio transcript (only completed)
+        if (item.role === 'user' && item.status === 'completed' && item.content && Array.isArray(item.content)) {
           item.content.forEach((part: any) => {
             if (part.type === 'input_audio' && part.transcript) {
               content += part.transcript;
@@ -134,15 +134,34 @@ export default function VoiceChat(_props: VoiceChatProps) {
           });
         }
         
-        // Handle assistant messages
-        else if (item.role === 'assistant' && item.content && Array.isArray(item.content)) {
-          item.content.forEach((part: any) => {
-            if (part.type === 'audio' && part.transcript) {
-              content += part.transcript;
-            } else if (part.type === 'text' && part.text) {
-              content += part.text;
-            }
-          });
+        // Handle assistant messages (can be in_progress or completed)
+        else if (item.role === 'assistant') {
+          // Try to get content from content array
+          if (item.content && Array.isArray(item.content)) {
+            item.content.forEach((part: any) => {
+              if (part.type === 'audio' && part.transcript) {
+                content += part.transcript;
+              } else if (part.type === 'text' && part.text) {
+                content += part.text;
+              }
+            });
+          }
+          
+          // Also try to get content from output array (alternative structure)
+          if (!content && item.output && Array.isArray(item.output)) {
+            item.output.forEach((part: any) => {
+              if (part.type === 'audio' && part.transcript) {
+                content += part.transcript;
+              } else if (part.type === 'text' && part.text) {
+                content += part.text;
+              }
+            });
+          }
+          
+          // Try direct content string
+          if (!content && typeof item.content === 'string') {
+            content = item.content;
+          }
         }
         
         // Handle direct string content (fallback)
