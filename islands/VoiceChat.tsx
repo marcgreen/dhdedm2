@@ -28,9 +28,17 @@ interface GameState {
   sceneDescription: string;
   activeQuests: string[];
   gameLog: string[];
+  toolCallLog: ToolCall[];
   sessionId: string;
   languageCorrections: number;
   vocabularyIntroduced: string[];
+}
+
+interface ToolCall {
+  timestamp: string;
+  toolName: string;
+  parameters: any;
+  result: string;
 }
 
 export default function VoiceChat(_props: VoiceChatProps) {
@@ -60,6 +68,7 @@ export default function VoiceChat(_props: VoiceChatProps) {
     sceneDescription: "Du stehst am Beginn eines neuen Abenteuers...",
     activeQuests: [],
     gameLog: [],
+    toolCallLog: [],
     sessionId: "",
     languageCorrections: 0,
     vocabularyIntroduced: []
@@ -79,6 +88,20 @@ export default function VoiceChat(_props: VoiceChatProps) {
         status.value = "Microphone permission required";
       });
   }, []);
+
+  // Helper function to log tool calls
+  const logToolCall = (toolName: string, parameters: any, result: string) => {
+    const newState = { ...gameState.value };
+    const toolCall: ToolCall = {
+      timestamp: new Date().toLocaleTimeString(),
+      toolName,
+      parameters,
+      result
+    };
+    newState.toolCallLog.push(toolCall);
+    gameState.value = newState;
+    console.log(`Tool Called: ${toolName}`, { parameters, result });
+  };
 
   // Create game state management tools using dynamic imports
   const createGameStateTools = async () => {
@@ -124,7 +147,10 @@ export default function VoiceChat(_props: VoiceChatProps) {
         }
         
         gameState.value = newState;
-        return `Character updated: ${newState.character.name} (Level ${newState.character.level}) - HP: ${newState.character.hitPoints}/${newState.character.maxHitPoints}`;
+        const result = `Character updated: ${newState.character.name} (Level ${newState.character.level}) - HP: ${newState.character.hitPoints}/${newState.character.maxHitPoints}`;
+        
+        logToolCall('update_character', args, result);
+        return result;
       },
     });
 
@@ -151,7 +177,10 @@ export default function VoiceChat(_props: VoiceChatProps) {
         }
         
         gameState.value = newState;
-        return `Inventory updated: ${args.action === 'add' ? 'Added' : 'Removed'} ${args.items.join(', ')}. Total items: ${newState.character.inventory.length}`;
+        const result = `Inventory updated: ${args.action === 'add' ? 'Added' : 'Removed'} ${args.items.join(', ')}. Total items: ${newState.character.inventory.length}`;
+        
+        logToolCall('update_inventory', args, result);
+        return result;
       },
     });
 
@@ -177,7 +206,10 @@ export default function VoiceChat(_props: VoiceChatProps) {
         if (args.location) newState.character.currentLocation = args.location;
         
         gameState.value = newState;
-        return `Scene updated: ${args.scene} - ${args.description}`;
+        const result = `Scene updated: ${args.scene} - ${args.description}`;
+        
+        logToolCall('update_scene', args, result);
+        return result;
       },
     });
 
@@ -208,11 +240,12 @@ export default function VoiceChat(_props: VoiceChatProps) {
         const rollString = `${count}d${args.sides}${modifier > 0 ? `+${modifier}` : modifier < 0 ? `${modifier}` : ''}`;
         const result = `Rolled ${rollString}: [${rolls.join(', ')}] = ${total}`;
         
-        // Add to game log
+        // Add to game log (for important rolls)
         const newState = { ...gameState.value };
         newState.gameLog.push(`${new Date().toLocaleTimeString()}: ${result}`);
         gameState.value = newState;
         
+        logToolCall('roll_dice', args, result);
         return result;
       },
     });
@@ -233,20 +266,24 @@ export default function VoiceChat(_props: VoiceChatProps) {
       },
       async execute(args: any) {
         const newState = { ...gameState.value };
+        let result = '';
         
         if (args.action === 'add') {
           newState.activeQuests.push(args.quest);
-          return `Quest added: ${args.quest}`;
+          result = `Quest added: ${args.quest}`;
         } else if (args.action === 'complete' && args.index !== undefined) {
           const completed = newState.activeQuests.splice(args.index, 1)[0];
-          return `Quest completed: ${completed}`;
+          result = `Quest completed: ${completed}`;
         } else if (args.action === 'update' && args.index !== undefined) {
           newState.activeQuests[args.index] = args.quest;
-          return `Quest updated: ${args.quest}`;
+          result = `Quest updated: ${args.quest}`;
+        } else {
+          result = `Quest ${args.action}: ${args.quest}`;
         }
         
         gameState.value = newState;
-        return `Quest ${args.action}: ${args.quest}`;
+        logToolCall('manage_quests', args, result);
+        return result;
       },
     });
 
@@ -274,7 +311,10 @@ export default function VoiceChat(_props: VoiceChatProps) {
         }
         
         gameState.value = newState;
-        return `Language progress updated: ${newState.languageCorrections} corrections, ${newState.vocabularyIntroduced.length} vocabulary words`;
+        const result = `Language progress updated: ${newState.languageCorrections} corrections, ${newState.vocabularyIntroduced.length} vocabulary words`;
+        
+        logToolCall('track_language', args, result);
+        return result;
       },
     });
 
@@ -294,7 +334,10 @@ export default function VoiceChat(_props: VoiceChatProps) {
         const newState = { ...gameState.value };
         newState.gameLog.push(`${new Date().toLocaleTimeString()}: ${args.entry}`);
         gameState.value = newState;
-        return `Log entry added: ${args.entry}`;
+        const result = `Log entry added: ${args.entry}`;
+        
+        logToolCall('add_game_log', args, result);
+        return result;
       },
     });
 
@@ -373,7 +416,7 @@ export default function VoiceChat(_props: VoiceChatProps) {
 - Nutze 'add_game_log' für wichtige Ereignisse
 
 **PÄDAGOGISCHE STRATEGIEN:**
-- Wiederhole wichtige Strukturen natürlich
+- Wiederhole wichtige Strukturien natürlich
 - Verwende Scaffolding (Gerüst) für komplexe Konzepte
 - Gib konstruktives Feedback
 - Passe die Komplexität an das Verständnis an
@@ -470,7 +513,7 @@ Starte mit einer freundlichen Begrüßung und frage nach dem Namen des Charakter
   };
 
   return (
-    <div class="max-w-4xl mx-auto p-4 space-y-6">
+    <div class="max-w-6xl mx-auto p-4 space-y-6">
       {/* Main Voice Interface */}
       <div class="text-center bg-gradient-to-br from-purple-900 to-blue-900 p-8 rounded-xl shadow-2xl">
         <h1 class="text-2xl font-bold text-white mb-2">Der Spielleiter</h1>
@@ -507,7 +550,7 @@ Starte mit einer freundlichen Begrüßung und frage nach dem Namen des Charakter
       </div>
 
       {/* Game State Display */}
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Character Sheet */}
         <div class="bg-slate-800 p-6 rounded-xl shadow-xl">
           <h2 class="text-xl font-bold text-white mb-4 flex items-center">
@@ -597,13 +640,44 @@ Starte mit einer freundlichen Begrüßung und frage nach dem Namen des Charakter
             )}
           </div>
         </div>
+      </div>
+
+      {/* Logs Section */}
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Tool Calls Log */}
+        <div class="bg-slate-800 p-6 rounded-xl shadow-xl">
+          <h2 class="text-xl font-bold text-white mb-4 flex items-center">
+            🔧 Tool-Aufrufe
+            <span class="ml-2 text-sm text-gray-400">({gameState.value.toolCallLog.length})</span>
+          </h2>
+          <div class="space-y-2 text-sm max-h-64 overflow-y-auto">
+            {gameState.value.toolCallLog.length > 0 ? (
+              gameState.value.toolCallLog.slice(-15).map((call, index) => (
+                <div key={index} class="bg-slate-700 p-3 rounded border-l-2 border-blue-500">
+                  <div class="flex justify-between items-start mb-1">
+                    <span class="text-blue-400 font-mono text-xs">{call.toolName}</span>
+                    <span class="text-gray-500 text-xs">{call.timestamp}</span>
+                  </div>
+                  <div class="text-gray-300 text-xs mb-1">
+                    <strong>Args:</strong> {JSON.stringify(call.parameters)}
+                  </div>
+                  <div class="text-green-300 text-xs">
+                    <strong>Result:</strong> {call.result}
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div class="text-gray-500 italic">Noch keine Tool-Aufrufe...</div>
+            )}
+          </div>
+        </div>
 
         {/* Game Log */}
         <div class="bg-slate-800 p-6 rounded-xl shadow-xl">
           <h2 class="text-xl font-bold text-white mb-4 flex items-center">
             📜 Spielprotokoll
           </h2>
-          <div class="space-y-2 text-sm max-h-48 overflow-y-auto">
+          <div class="space-y-2 text-sm max-h-64 overflow-y-auto">
             {gameState.value.gameLog.length > 0 ? (
               gameState.value.gameLog.slice(-10).map((entry, index) => (
                 <div key={index} class="text-gray-300 text-xs border-l-2 border-slate-600 pl-2">
