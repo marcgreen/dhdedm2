@@ -9,7 +9,10 @@ export const handler: Handlers = {
     try {
       const apiKey = Deno.env.get("OPENAI_API_KEY");
       
+      console.log('API Key status:', apiKey ? 'Present' : 'Missing');
+      
       if (!apiKey) {
+        console.error('OpenAI API key not found in environment variables');
         return new Response(
           JSON.stringify({ error: "OpenAI API key not configured" }),
           { 
@@ -24,6 +27,7 @@ export const handler: Handlers = {
       if (body.action === "get_session_config") {
         try {
           // Generate ephemeral client token using the main API key
+          console.log('Attempting to generate ephemeral token...');
           const response = await fetch('https://api.openai.com/v1/realtime/sessions', {
             method: 'POST',
             headers: {
@@ -34,6 +38,8 @@ export const handler: Handlers = {
               model: 'gpt-4o-realtime-preview-2025-06-03'
             })
           });
+          
+          console.log('OpenAI API Response Status:', response.status);
 
           if (!response.ok) {
             const errorText = await response.text();
