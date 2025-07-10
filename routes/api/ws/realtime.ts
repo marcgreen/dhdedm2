@@ -197,8 +197,11 @@ export const handler: Handlers = {
             }
 
             try {
+              console.log('Creating RealtimeAgent and RealtimeSession...');
+              
               // Create the agent with tools
               const tools = createGameStateTools();
+              console.log('Game tools created successfully');
               
               const agent = new RealtimeAgent({
                 name: 'Der Spielleiter',
@@ -232,6 +235,7 @@ Starte mit einer freundlichen Begrüßung und frage nach dem Namen des Charakter
               });
 
               // Create session
+              console.log('Creating RealtimeSession...');
               realtimeSession = new RealtimeSession(agent, {
                 model: 'gpt-4o-realtime-preview-2025-06-03',
                 config: {
@@ -240,6 +244,7 @@ Starte mit einer freundlichen Begrüßung und frage nach dem Namen des Charakter
                   },
                 },
               });
+              console.log('RealtimeSession created successfully');
 
               // Set up event forwarding to client
               realtimeSession.on('history_updated', (history) => {
@@ -273,9 +278,11 @@ Starte mit einer freundlichen Begrüßung und frage nach dem Namen des Charakter
               });
 
               // Connect to OpenAI
+              console.log('Connecting to OpenAI Realtime API...');
               await realtimeSession.connect({
                 apiKey: message.clientApiKey,
               });
+              console.log('Successfully connected to OpenAI Realtime API');
 
               if (sessionId) {
                 sessions.set(sessionId, realtimeSession);
@@ -285,6 +292,7 @@ Starte mit einer freundlichen Begrüßung und frage nach dem Namen des Charakter
                 type: 'connected', 
                 sessionId 
               }));
+              console.log('WebSocket connection completed successfully');
 
                          } catch (error) {
               console.error('Failed to create session:', error);
@@ -298,28 +306,51 @@ Starte mit einer freundlichen Begrüßung und frage nach dem Namen des Charakter
             break;
 
           case 'audio':
-            if (realtimeSession && message.audio) {
-              try {
-                // The audio is base64 encoded, we need to convert it to the format expected by the SDK
-                // The RealtimeSession expects raw audio data, not base64
+            if (!realtimeSession) {
+              console.error('No realtime session available for audio processing');
+              socket.send(JSON.stringify({ 
+                type: 'error', 
+                error: 'Realtime session not initialized' 
+              }));
+              break;
+            }
+            
+            if (!message.audio) {
+              console.error('Audio message received without audio data');
+              break;
+            }
+
+            try {
+              // For now, let's just log that we received audio without processing it
+              // The actual RealtimeSession setup might be failing
+              console.log('Audio chunk received, length:', message.audio.length);
+              
+              // Check what methods are available on the realtimeSession
+              console.log('RealtimeSession methods:', Object.getOwnPropertyNames(realtimeSession));
+              
+              // Try to send audio if the method exists
+              if (typeof realtimeSession.sendAudio === 'function') {
                 const binaryString = atob(message.audio);
                 const audioBuffer = new Uint8Array(binaryString.length);
                 for (let i = 0; i < binaryString.length; i++) {
                   audioBuffer[i] = binaryString.charCodeAt(i);
                 }
-                // Send the audio data to the RealtimeSession
-                if (typeof realtimeSession.sendAudio === 'function') {
-                  realtimeSession.sendAudio(audioBuffer.buffer);
-                } else if (typeof (realtimeSession as any).send === 'function') {
-                  // Alternative method if sendAudio is not available
-                  (realtimeSession as any).send({
-                    type: 'input_audio_buffer.append',
-                    audio: message.audio
-                  });
-                }
-              } catch (error) {
-                console.error('Error forwarding audio:', error);
+                await realtimeSession.sendAudio(audioBuffer.buffer);
+                console.log('Audio sent successfully via sendAudio');
+              } else {
+                console.error('sendAudio method not available on RealtimeSession');
+                socket.send(JSON.stringify({ 
+                  type: 'error', 
+                  error: 'Audio processing method not available' 
+                }));
               }
+            } catch (error) {
+              console.error('Error processing audio:', error);
+              const errorMessage = error instanceof Error ? error.message : String(error);
+              socket.send(JSON.stringify({ 
+                type: 'error', 
+                error: `Audio processing failed: ${errorMessage}` 
+              }));
             }
             break;
 

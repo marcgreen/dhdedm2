@@ -247,8 +247,9 @@ export default function VoiceChat(_props: VoiceChatProps) {
           break;
           
         case 'error':
-          console.error('WebSocket error:', message.error);
-          status.value = `Error: ${message.error}`;
+          const errorMsg = typeof message.error === 'string' ? message.error : JSON.stringify(message.error);
+          console.error('WebSocket error:', errorMsg);
+          status.value = `Error: ${errorMsg}`;
           isConnected.value = false;
           isConnecting.value = false;
           break;
