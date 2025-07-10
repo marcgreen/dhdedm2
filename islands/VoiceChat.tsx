@@ -29,6 +29,7 @@ interface GameState {
   activeQuests: string[];
   gameLog: string[];
   toolCallLog: ToolCall[];
+  conversationHistory: ConversationItem[];
   sessionId: string;
   languageCorrections: number;
   vocabularyIntroduced: string[];
@@ -39,6 +40,13 @@ interface ToolCall {
   toolName: string;
   parameters: any;
   result: string;
+}
+
+interface ConversationItem {
+  timestamp: string;
+  role: 'user' | 'assistant';
+  content: string;
+  type: 'message' | 'audio';
 }
 
 export default function VoiceChat(_props: VoiceChatProps) {
@@ -69,6 +77,7 @@ export default function VoiceChat(_props: VoiceChatProps) {
     activeQuests: [],
     gameLog: [],
     toolCallLog: [],
+    conversationHistory: [],
     sessionId: "",
     languageCorrections: 0,
     vocabularyIntroduced: []
@@ -101,6 +110,64 @@ export default function VoiceChat(_props: VoiceChatProps) {
     newState.toolCallLog.push(toolCall);
     gameState.value = newState;
     console.log(`Tool Called: ${toolName}`, { parameters, result });
+  };
+
+  // Helper function to update conversation history
+  const updateConversationHistory = (history: any[]) => {
+    const newState = { ...gameState.value };
+    const formattedHistory: ConversationItem[] = [];
+    
+    history.forEach((item: any) => {
+      if (item.type === 'message') {
+        // Extract text content from the message
+        let content = '';
+        if (item.content && Array.isArray(item.content)) {
+          // Handle content array format
+          item.content.forEach((part: any) => {
+            if (part.type === 'text' && part.text) {
+              content += part.text;
+            } else if (part.type === 'input_text' && part.text) {
+              content += part.text;
+            }
+          });
+        } else if (typeof item.content === 'string') {
+          content = item.content;
+        }
+        
+        if (content.trim()) {
+          formattedHistory.push({
+            timestamp: new Date().toLocaleTimeString(),
+            role: item.role === 'user' ? 'user' : 'assistant',
+            content: content.trim(),
+            type: 'message'
+          });
+        }
+      } else if (item.type === 'response' && item.output) {
+        // Handle assistant responses
+        let content = '';
+        if (Array.isArray(item.output)) {
+          item.output.forEach((outputItem: any) => {
+            if (outputItem.type === 'audio' && outputItem.transcript) {
+              content += outputItem.transcript;
+            } else if (outputItem.type === 'text' && outputItem.text) {
+              content += outputItem.text;
+            }
+          });
+        }
+        
+        if (content.trim()) {
+          formattedHistory.push({
+            timestamp: new Date().toLocaleTimeString(),
+            role: 'assistant',
+            content: content.trim(),
+            type: 'message'
+          });
+        }
+      }
+    });
+    
+    newState.conversationHistory = formattedHistory;
+    gameState.value = newState;
   };
 
   // Create game state management tools using dynamic imports
@@ -442,9 +509,20 @@ Starte mit einer freundlichen Begrüßung und frage nach dem Namen des Charakter
 
       const session = new RealtimeSession(agent, {
         model: 'gpt-4o-realtime-preview-2025-06-03',
+        config: {
+          inputAudioTranscription: {
+            model: 'gpt-4o-mini-transcribe',
+          },
+        },
       });
       
       sessionRef.current = session;
+      
+      // Set up conversation history tracking
+      session.on('history_updated', (history) => {
+        console.log('History updated:', history);
+        updateConversationHistory(history);
+      });
       
       // Connect using the ephemeral client token (secure for browser)
       await session.connect({
@@ -642,8 +720,41 @@ Starte mit einer freundlichen Begrüßung und frage nach dem Namen des Charakter
         </div>
       </div>
 
-      {/* Logs Section */}
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Conversation and Logs Section */}
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        {/* Conversation Transcript */}
+        <div class="bg-slate-800 p-6 rounded-xl shadow-xl">
+          <h2 class="text-xl font-bold text-white mb-4 flex items-center">
+            💬 Unterhaltung
+            <span class="ml-2 text-sm text-gray-400">({gameState.value.conversationHistory.length})</span>
+          </h2>
+          <div class="space-y-3 text-sm max-h-64 overflow-y-auto">
+            {gameState.value.conversationHistory.length > 0 ? (
+              gameState.value.conversationHistory.slice(-20).map((message, index) => (
+                <div key={index} class={`p-3 rounded-lg ${
+                  message.role === 'user' 
+                    ? 'bg-blue-900 ml-4 border-l-2 border-blue-400' 
+                    : 'bg-purple-900 mr-4 border-l-2 border-purple-400'
+                }`}>
+                  <div class="flex justify-between items-start mb-1">
+                    <span class={`text-xs font-semibold ${
+                      message.role === 'user' ? 'text-blue-300' : 'text-purple-300'
+                    }`}>
+                      {message.role === 'user' ? 'Du' : 'Der Spielleiter'}
+                    </span>
+                    <span class="text-gray-500 text-xs">{message.timestamp}</span>
+                  </div>
+                  <div class="text-gray-200 text-sm leading-relaxed">
+                    {message.content}
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div class="text-gray-500 italic">Noch keine Unterhaltung...</div>
+            )}
+          </div>
+        </div>
+
         {/* Tool Calls Log */}
         <div class="bg-slate-800 p-6 rounded-xl shadow-xl">
           <h2 class="text-xl font-bold text-white mb-4 flex items-center">
