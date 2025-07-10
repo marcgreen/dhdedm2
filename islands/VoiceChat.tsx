@@ -8,10 +8,7 @@ export default function VoiceChat(_props: VoiceChatProps) {
   const isConnected = useSignal(false);
   const isConnecting = useSignal(false);
   const status = useSignal("Ready to start");
-  const wsRef = useRef<WebSocket | null>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const audioContextRef = useRef<AudioContext | null>(null);
+  const sessionRef = useRef<any>(null);
 
   // Initialize voice chat when component mounts
   useEffect(() => {
@@ -33,9 +30,9 @@ export default function VoiceChat(_props: VoiceChatProps) {
     
     try {
       isConnecting.value = true;
-      status.value = "Connecting...";
+      status.value = "Generating secure session token...";
       
-      // Check server configuration
+      // Get ephemeral client token from server
       const response = await fetch('/api/voice', {
         method: 'POST',
         headers: {
@@ -51,94 +48,36 @@ export default function VoiceChat(_props: VoiceChatProps) {
       }
       
       const config = await response.json();
-      console.log('Server config:', config);
       
-      // Get user media
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          sampleRate: 24000,
-        }
+      if (config.error) {
+        throw new Error(config.error);
+      }
+      
+      status.value = "Connecting to OpenAI...";
+      
+      // Follow the EXACT pattern from the docs
+      const { RealtimeAgent, RealtimeSession } = await import('@openai/agents/realtime');
+      
+      const agent = new RealtimeAgent({
+        name: 'Assistant',
+        instructions: 'You are a helpful voice assistant. Keep your responses natural, conversational, and concise.',
+      });
+
+      const session = new RealtimeSession(agent, {
+        model: 'gpt-4o-realtime-preview-2025-06-03',
       });
       
-      streamRef.current = stream;
+      sessionRef.current = session;
       
-      // Create AudioContext for processing
-      audioContextRef.current = new (window.AudioContext || (window as any).webkitAudioContext)();
+      // Connect using the ephemeral client token (secure for browser)
+      await session.connect({
+        apiKey: config.clientApiKey,
+      });
       
-      // Connect to our secure WebSocket proxy
-      const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${wsProtocol}//${window.location.host}/api/voice`;
-      const ws = new WebSocket(wsUrl);
-      
-      wsRef.current = ws;
-      
-      ws.onopen = () => {
-        console.log('Connected to secure WebSocket proxy');
-        status.value = "Connecting to OpenAI...";
-      };
-      
-      ws.onmessage = (event) => {
-        const message = JSON.parse(event.data);
-        console.log('Received message:', message);
-        
-        switch (message.type) {
-          case 'connection_ready':
-            isConnected.value = true;
-            isConnecting.value = false;
-            status.value = "Connected - Speak now!";
-            startAudioCapture();
-            break;
-            
-          case 'input_audio_buffer.speech_started':
-            status.value = "Listening...";
-            break;
-            
-          case 'input_audio_buffer.speech_stopped':
-            status.value = "Processing...";
-            break;
-            
-          case 'response.audio.delta':
-            status.value = "AI is speaking...";
-            // Handle audio playback
-            if (message.audio) {
-              playAudioChunk(message.audio);
-            }
-            break;
-            
-          case 'response.done':
-            status.value = "Connected - Speak now!";
-            break;
-            
-          case 'error':
-            console.error('Server error:', message);
-            status.value = "Error: " + message.error;
-            isConnected.value = false;
-            isConnecting.value = false;
-            break;
-            
-          case 'connection_closed':
-            isConnected.value = false;
-            isConnecting.value = false;
-            status.value = "Disconnected";
-            break;
-        }
-      };
-      
-      ws.onerror = (error) => {
-        console.error('WebSocket error:', error);
-        status.value = "Connection error";
-        isConnected.value = false;
-        isConnecting.value = false;
-      };
-      
-      ws.onclose = () => {
-        console.log('WebSocket disconnected');
-        isConnected.value = false;
-        isConnecting.value = false;
-        status.value = "Disconnected";
-      };
+      isConnected.value = true;
+      isConnecting.value = false;
+      status.value = "Connected - Speak now!";
+      console.log('Voice session connected successfully with ephemeral token');
       
     } catch (error) {
       console.error('Voice chat error:', error);
@@ -148,75 +87,13 @@ export default function VoiceChat(_props: VoiceChatProps) {
     }
   };
 
-  const startAudioCapture = () => {
-    if (!streamRef.current || !wsRef.current) return;
-    
-    const mediaRecorder = new MediaRecorder(streamRef.current, {
-      mimeType: 'audio/webm;codecs=opus'
-    });
-    
-    mediaRecorderRef.current = mediaRecorder;
-    
-    mediaRecorder.ondataavailable = (event) => {
-      if (event.data.size > 0 && wsRef.current?.readyState === WebSocket.OPEN) {
-        // Convert audio to base64 and send to server
-        const reader = new FileReader();
-        reader.onload = () => {
-          const base64Audio = (reader.result as string).split(',')[1];
-          wsRef.current?.send(JSON.stringify({
-            type: 'input_audio_buffer.append',
-            audio: base64Audio
-          }));
-        };
-        reader.readAsDataURL(event.data);
-      }
-    };
-    
-    mediaRecorder.start(100); // Send audio chunks every 100ms
-  };
-
-  const playAudioChunk = async (base64Audio: string) => {
-    if (!audioContextRef.current) return;
-    
-    try {
-      const audioData = Uint8Array.from(atob(base64Audio), c => c.charCodeAt(0));
-      const audioBuffer = await audioContextRef.current.decodeAudioData(audioData.buffer);
-      
-      const source = audioContextRef.current.createBufferSource();
-      source.buffer = audioBuffer;
-      source.connect(audioContextRef.current.destination);
-      source.start();
-    } catch (error) {
-      console.error('Audio playback error:', error);
-    }
-  };
-
   const stopVoiceChat = async () => {
     if (!IS_BROWSER) return;
     
     try {
-      // Stop media recorder
-      if (mediaRecorderRef.current) {
-        mediaRecorderRef.current.stop();
-        mediaRecorderRef.current = null;
-      }
-      
-      // Stop stream
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop());
-        streamRef.current = null;
-      }
-      
-      // Close WebSocket
-      if (wsRef.current) {
-        wsRef.current.close();
-        wsRef.current = null;
-      }
-      
-      // Close audio context
-      if (audioContextRef.current) {
-        audioContextRef.current.close();
-        audioContextRef.current = null;
+      if (sessionRef.current) {
+        await sessionRef.current.disconnect();
+        sessionRef.current = null;
       }
       
       isConnected.value = false;
@@ -270,7 +147,7 @@ export default function VoiceChat(_props: VoiceChatProps) {
           <div class="text-xs text-gray-400 mt-4">
             🎤 Voice detection active • 🔊 AI responses will play automatically
             <br />
-            🔒 Secure connection via server proxy
+            🔒 Secure ephemeral token • 🚀 OpenAI Agents SDK
           </div>
         )}
       </div>

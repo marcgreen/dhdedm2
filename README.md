@@ -1,101 +1,4 @@
-# 🎙️ Voice Chat AI
-
-A real-time voice chat application built with Fresh framework and OpenAI's Realtime Voice API.
-
-## Features
-
-- **Real-time Voice Chat**: Talk with AI using your voice
-- **Modern UI**: Clean, responsive design with Tailwind CSS
-- **WebRTC Audio**: High-quality voice capture and playback
-- **OpenAI Integration**: Powered by OpenAI's Realtime Voice API
-- **No Build Step**: Instant development with Fresh framework
-
-## Prerequisites
-
-- [Deno](https://deno.land/manual/getting_started/installation) 1.45.2 or later
-- OpenAI API key with access to the Realtime Voice API
-
-## Setup
-
-1. **Clone and install dependencies**:
-   ```bash
-   # Dependencies are automatically managed by Deno
-   ```
-
-2. **Set up environment variables**:
-   ```bash
-   # Create a .env file in the root directory
-   echo "OPENAI_API_KEY=your_openai_api_key_here" > .env
-   ```
-
-3. **Get your OpenAI API key**:
-   - Go to [OpenAI Platform](https://platform.openai.com/api-keys)
-   - Create a new API key
-   - Make sure you have access to the Realtime Voice API
-
-## Development
-
-Start the development server:
-
-```bash
-deno task start
-```
-
-This will start the server at `http://localhost:8000` with hot reloading enabled.
-
-## Usage
-
-1. Open your browser and navigate to `http://localhost:8000`
-2. Click the microphone button to start a voice chat
-3. Allow microphone permissions when prompted
-4. Start talking to the AI assistant!
-
-## Deployment
-
-Deploy to Deno Deploy:
-
-1. Push your code to a GitHub repository
-2. Create a new project on [Deno Deploy](https://dash.deno.com)
-3. Connect your GitHub repository
-4. Set the `OPENAI_API_KEY` environment variable in your project settings
-5. Deploy!
-
-## Project Structure
-
-```
-├── islands/
-│   └── VoiceChat.tsx      # Voice chat component (client-side)
-├── routes/
-│   ├── api/
-│   │   └── voice.ts       # Voice API endpoint
-│   └── index.tsx          # Main page
-├── static/                # Static assets
-├── deno.json             # Deno configuration
-└── main.ts               # Application entry point
-```
-
-## Technology Stack
-
-- **Frontend**: Fresh framework with Preact
-- **Backend**: Deno runtime
-- **Voice AI**: OpenAI Realtime Voice API
-- **Styling**: Tailwind CSS
-- **Audio**: WebRTC MediaRecorder API
-- **Deployment**: Deno Deploy
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch
-3. Make your changes
-4. Test thoroughly
-5. Submit a pull request
-
-## License
-
-MIT License - feel free to use this project for your own applications!
-
-# fresh project
+# Fresh Project - OpenAI Realtime Voice Chat
 
 ### Usage
 
@@ -109,9 +12,9 @@ deno task start
 
 This will watch the project directory and restart as necessary.
 
-## Realtime Voice Chat
+## OpenAI Agents SDK Realtime Voice Chat
 
-This project now includes a realtime voice chat feature powered by OpenAI's Realtime API. Here's how to use it:
+This project implements a **secure realtime voice chat** using the OpenAI Agents SDK following the exact quickstart guide pattern with **ephemeral client tokens**.
 
 ### Setup
 
@@ -136,20 +39,69 @@ This project now includes a realtime voice chat feature powered by OpenAI's Real
 - **Start speaking** - the AI will respond in real-time
 - **Click the 🔴 button** to stop the session
 
+### Secure Implementation
+
+Following the **exact OpenAI Agents SDK security pattern**:
+
+**Server (generates ephemeral token):**
+```bash
+curl -X POST https://api.openai.com/v1/realtime/sessions \
+   -H "Authorization: Bearer $OPENAI_API_KEY" \
+   -H "Content-Type: application/json" \
+   -d '{"model": "gpt-4o-realtime-preview-2025-06-03"}'
+```
+
+**Client (uses ephemeral token):**
+```typescript
+import { RealtimeAgent, RealtimeSession } from '@openai/agents/realtime';
+
+const agent = new RealtimeAgent({
+  name: 'Assistant',
+  instructions: 'You are a helpful voice assistant...',
+});
+
+const session = new RealtimeSession(agent, {
+  model: 'gpt-4o-realtime-preview-2025-06-03',
+});
+
+// Connect using ephemeral client token (secure for browser)
+await session.connect({
+  apiKey: '<ephemeral-client-token>',
+});
+```
+
 ### Features
 
-- **True realtime conversation** - No waiting for speech-to-text processing
-- **Voice activity detection** - Automatically detects when you start and stop speaking
-- **Real-time audio playback** - Hear the AI's response as it's generated
-- **WebSocket connection** - Direct connection to OpenAI's Realtime API
-- **Audio processing** - Automatic echo cancellation and noise suppression
+- **✅ Secure ephemeral tokens** - Main API key never sent to browser
+- **✅ True realtime conversation** - No speech-to-text delays
+- **✅ Automatic WebRTC handling** - SDK manages all audio connections
+- **✅ Voice activity detection** - Built-in conversation flow
+- **✅ Simple implementation** - Following official docs exactly!
+
+### Security Flow
+
+```
+1. Browser → Server: Request session
+2. Server → OpenAI: Generate ephemeral token (with main API key)
+3. Server → Browser: Return ephemeral token
+4. Browser → OpenAI: Connect with ephemeral token (secure)
+```
 
 ### Technical Details
 
-The implementation uses:
-- **WebSocket connection** to OpenAI's Realtime API
-- **MediaRecorder API** for capturing audio
-- **Real-time audio streaming** in base64 format
-- **Server-side Voice Activity Detection (VAD)** for natural conversations
+The OpenAI Agents SDK handles:
+- **WebRTC connection** to your microphone and speakers
+- **Real-time audio streaming** to OpenAI's servers
+- **Voice activity detection** for natural conversation flow
+- **Audio processing** and playback
+- **All WebSocket protocol details** automatically
 
-No additional dependencies required - everything works directly in the browser!
+**Zero manual audio processing required!** The SDK does all the heavy lifting.
+
+### Production Ready
+
+This implementation is **production ready** because:
+- ✅ Main API key stays secure on server
+- ✅ Ephemeral tokens are temporary and browser-safe
+- ✅ No sensitive credentials exposed to client
+- ✅ Following official OpenAI security recommendations
