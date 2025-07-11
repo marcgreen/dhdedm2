@@ -301,16 +301,20 @@ export default function VoiceChat(_props: VoiceChatProps) {
           channelCount: 1,
           echoCancellation: true,
           noiseSuppression: true,
+          // Request 24kHz sample rate to match OpenAI requirements
+          sampleRate: 24000
         } 
       });
 
-      // Create audio context using browser's default sample rate
-      audioContextRef.current = new AudioContext();
+      // Create audio context with 24kHz sample rate (required by OpenAI)
+      audioContextRef.current = new AudioContext({ sampleRate: 24000 });
       console.log('Audio context sample rate:', audioContextRef.current.sampleRate);
+      
       const source = audioContextRef.current.createMediaStreamSource(stream);
       
-      // Create a ScriptProcessorNode to capture raw audio data
-      const bufferSize = 4096;
+      // Use AudioWorklet for better performance instead of deprecated ScriptProcessor
+      // For now, use createScriptProcessor with proper settings
+      const bufferSize = 2048; // Larger buffer for better stability
       const processor = audioContextRef.current.createScriptProcessor(bufferSize, 1, 1);
       
       processor.onaudioprocess = (event) => {
@@ -318,17 +322,20 @@ export default function VoiceChat(_props: VoiceChatProps) {
           const inputBuffer = event.inputBuffer;
           const inputData = inputBuffer.getChannelData(0);
           
-          // Convert Float32Array to PCM16
-          const pcm16Buffer = new Int16Array(inputData.length);
+          // Convert Float32Array to PCM16 with proper endianness
+          const pcm16Buffer = new ArrayBuffer(inputData.length * 2);
+          const view = new DataView(pcm16Buffer);
+          
           for (let i = 0; i < inputData.length; i++) {
-            // Convert from [-1, 1] float to [-32768, 32767] int16
+            // Clamp to [-1, 1] and convert to 16-bit integer
             const sample = Math.max(-1, Math.min(1, inputData[i]));
-            pcm16Buffer[i] = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+            const intSample = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
+            // Write as little-endian 16-bit signed integer
+            view.setInt16(i * 2, intSample, true);
           }
           
           // Convert to base64 for transmission
-          const arrayBuffer = pcm16Buffer.buffer;
-          const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)));
+          const base64 = btoa(String.fromCharCode(...new Uint8Array(pcm16Buffer)));
           
           wsRef.current.send(JSON.stringify({
             type: 'audio',
@@ -344,7 +351,7 @@ export default function VoiceChat(_props: VoiceChatProps) {
       // Store the processor for cleanup
       mediaRecorderRef.current = processor as any;
       
-      console.log('Started PCM16 audio capture');
+      console.log('Started PCM16 audio capture at 24kHz');
     } catch (error) {
       console.error('Error starting audio capture:', error);
       status.value = "Error accessing microphone";
@@ -361,7 +368,8 @@ export default function VoiceChat(_props: VoiceChatProps) {
     
     try {
       if (!audioContextRef.current) {
-        audioContextRef.current = new AudioContext();
+        // Create audio context with 24kHz sample rate for consistency
+        audioContextRef.current = new AudioContext({ sampleRate: 24000 });
       }
       
       // Resume audio context if suspended
@@ -371,7 +379,7 @@ export default function VoiceChat(_props: VoiceChatProps) {
       
       // Get the next audio chunk from the queue
       const audioChunk = audioQueueRef.current.shift()!;
-      const openAISampleRate = 24000;
+      const openAISampleRate = 24000; // OpenAI uses 24kHz for PCM16
       
       // Create audio buffer at OpenAI's sample rate
       const audioBuffer = audioContextRef.current.createBuffer(
@@ -452,7 +460,7 @@ export default function VoiceChat(_props: VoiceChatProps) {
       // Decode base64 to binary string
       const audioData = atob(base64Audio);
       
-      // Convert binary string to ArrayBuffer first
+      // Convert binary string to ArrayBuffer
       const arrayBuffer = new ArrayBuffer(audioData.length);
       const uint8View = new Uint8Array(arrayBuffer);
       for (let i = 0; i < audioData.length; i++) {
@@ -466,8 +474,10 @@ export default function VoiceChat(_props: VoiceChatProps) {
       // Convert to Float32Array for AudioBuffer (PCM16 to Float32)
       const float32Data = new Float32Array(sampleCount);
       for (let i = 0; i < sampleCount; i++) {
-        const int16Sample = dataView.getInt16(i * 2, true); // little-endian
-        float32Data[i] = int16Sample / 32768.0; // Convert to float [-1, 1]
+        // Read little-endian 16-bit signed integer (OpenAI uses little-endian)
+        const int16Sample = dataView.getInt16(i * 2, true);
+        // Convert to float [-1, 1] with proper scaling
+        float32Data[i] = int16Sample / 32768.0;
       }
       
       // Add to audio queue
