@@ -249,63 +249,67 @@ Starte mit einer freundlichen Begrüßung und frage nach dem Namen des Charakter
 
               // Set up event forwarding to client with enhanced logging
               console.log('Setting up RealtimeSession event listeners...');
+              if (realtimeSession) {
+                console.log('RealtimeSession type:', typeof realtimeSession);
+                console.log('RealtimeSession keys:', Object.keys(realtimeSession));
+                console.log('RealtimeSession prototype methods:', Object.getOwnPropertyNames(Object.getPrototypeOf(realtimeSession)));
+              }
               
-              realtimeSession.on('history_updated', (history) => {
-                console.log('History updated event received');
-                socket.send(JSON.stringify({ 
-                  type: 'history_updated', 
-                  history 
-                }));
-              });
-
-              realtimeSession.on('audio', (event: any) => {
-                console.log('Audio response received from OpenAI');
-                console.log('Audio event type:', typeof event);
-                console.log('Audio event keys:', Object.keys(event || {}));
-                
-                // According to docs, event.data should contain PCM16 audio
-                const audioData = event?.data || event;
-                if (audioData) {
-                  console.log('Audio data length:', audioData.length || audioData.byteLength || 'unknown');
-                  
-                  // Convert ArrayBuffer to base64 for transmission
-                  let base64Audio;
-                  if (audioData instanceof ArrayBuffer) {
-                    base64Audio = btoa(String.fromCharCode(...new Uint8Array(audioData)));
-                  } else if (audioData.buffer) {
-                    base64Audio = btoa(String.fromCharCode(...new Uint8Array(audioData.buffer)));
-                  } else {
-                    base64Audio = audioData; // Already base64?
+              // Try to listen for common events that might exist
+              const commonEvents = [
+                'audio', 'response', 'message', 'conversation.item.created', 
+                'response.audio', 'response.audio.delta', 'conversation.item.completed',
+                'conversation.updated', 'session.updated', 'input_audio_buffer.speech_started',
+                'input_audio_buffer.speech_stopped', 'response.created', 'response.done'
+              ];
+              
+              if (realtimeSession) {
+                commonEvents.forEach(eventName => {
+                  try {
+                    realtimeSession!.on(eventName as any, (data: any) => {
+                    console.log(`Event received: ${eventName}`, typeof data, Object.keys(data || {}));
+                    
+                    // Handle audio events
+                    if (eventName.includes('audio') && data) {
+                      const audioData = data?.data || data?.audio || data;
+                      if (audioData) {
+                        try {
+                          // Convert ArrayBuffer to base64 for transmission
+                          let base64Audio;
+                          if (audioData instanceof ArrayBuffer) {
+                            base64Audio = btoa(String.fromCharCode(...new Uint8Array(audioData)));
+                          } else if (audioData.buffer) {
+                            base64Audio = btoa(String.fromCharCode(...new Uint8Array(audioData.buffer)));
+                          } else if (typeof audioData === 'string') {
+                            base64Audio = audioData; // Already base64?
+                          }
+                          
+                          if (base64Audio) {
+                            console.log('Forwarding audio response to client, length:', base64Audio.length);
+                            socket.send(JSON.stringify({ 
+                              type: 'audio', 
+                              audio: base64Audio
+                            }));
+                          }
+                        } catch (error) {
+                          console.error('Error processing audio event:', error);
+                        }
+                      }
+                    }
+                    
+                    // Forward all events to client for debugging
+                    socket.send(JSON.stringify({
+                      type: 'realtime_event',
+                      eventName,
+                      data
+                    }));
+                  });
+                  console.log(`Successfully registered listener for: ${eventName}`);
+                  } catch (error) {
+                    console.log(`Failed to register listener for ${eventName}:`, error);
                   }
-                  
-                  socket.send(JSON.stringify({ 
-                    type: 'audio', 
-                    audio: base64Audio
-                  }));
-                } else {
-                  console.warn('Audio event received but no audio data found');
-                }
-              });
-
-              realtimeSession.on('error', (error: any) => {
-                console.error('RealtimeSession error:', error);
-                socket.send(JSON.stringify({ 
-                  type: 'error', 
-                  error: error?.message || String(error) 
-                }));
-              });
-
-              // Tool execution events
-              realtimeSession.on('tool_executed', (result: any) => {
-                console.log('Tool executed event received:', result?.name || 'unknown');
-                socket.send(JSON.stringify({ 
-                  type: 'tool_executed', 
-                  result 
-                }));
-              });
-              
-              // Log all events that might be available
-              console.log('Available RealtimeSession methods:', Object.getOwnPropertyNames(Object.getPrototypeOf(realtimeSession)));
+                });
+              }
 
               // Connect to OpenAI using WebSocket transport
               console.log('Connecting to OpenAI Realtime API via WebSocket...');
