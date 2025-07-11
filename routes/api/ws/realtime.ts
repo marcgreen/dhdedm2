@@ -252,49 +252,36 @@ Starte mit einer freundlichen Begrüßung und frage nach dem Namen des Charakter
               
               // Listen for audio responses using the documented API
               realtimeSession.on('audio', (event: any) => {
-                console.log('🔊 AUDIO EVENT RECEIVED from RealtimeSession!', event);
-                
                 // According to docs: event.data is a chunk of PCM16 audio
                 const audioData = event.data || event;
                 
                 if (audioData) {
-                  console.log('🎯 Processing audio data, type:', typeof audioData, 'length:', audioData.length || audioData.byteLength || 'unknown');
-                  
                   try {
                     let base64Audio;
                     
                     if (audioData instanceof ArrayBuffer) {
-                      console.log('Converting ArrayBuffer to base64, bytes:', audioData.byteLength);
                       base64Audio = btoa(String.fromCharCode(...new Uint8Array(audioData)));
                     } else if (audioData instanceof Uint8Array) {
-                      console.log('Converting Uint8Array to base64, bytes:', audioData.length);
                       base64Audio = btoa(String.fromCharCode(...audioData));
                     } else if (typeof audioData === 'string') {
-                      console.log('Audio data is already a string, length:', audioData.length);
                       base64Audio = audioData;
                     } else {
-                      console.log('Unknown audio data format:', typeof audioData, audioData);
+                      console.log('Unknown audio data format:', typeof audioData);
                     }
                     
                     if (base64Audio) {
-                      console.log('📤 Forwarding PCM16 audio to client, base64 length:', base64Audio.length);
                       socket.send(JSON.stringify({ 
                         type: 'audio', 
-                        audio: base64Audio,
-                        debug: { 
-                          originalType: typeof audioData,
-                          originalLength: audioData.length || audioData.byteLength || 'unknown'
-                        }
+                        audio: base64Audio
                       }));
                     } else {
-                      console.log('❌ Failed to convert audio data to base64');
+                      console.log('Failed to convert audio data to base64');
                     }
                   } catch (error) {
-                    console.error('❌ Error processing audio data:', error);
+                    console.error('Error processing audio data:', error);
                   }
                 } else {
-                  console.log('❌ Audio event received but no data found');
-                  console.log('Event structure:', Object.keys(event || {}));
+                  console.log('Audio event received but no data found');
                 }
               });
               
@@ -353,37 +340,25 @@ Starte mit einer freundlichen Begrüßung und frage nach dem Namen des Charakter
                 view[i] = binaryString.charCodeAt(i);
               }
               
-              // Log audio chunk details (less frequently to avoid spam)
-              if (Math.random() < 0.01) { // Log ~1% of chunks
-                console.log('PCM16 audio chunk - base64 length:', message.audio.length, 'bytes:', arrayBuffer.byteLength);
-              }
-              
               // Send PCM16 audio to OpenAI Realtime API
               if (typeof realtimeSession.sendAudio === 'function') {
-                console.log('📤 Sending audio to RealtimeSession, bytes:', arrayBuffer.byteLength);
                 const result = await realtimeSession.sendAudio(arrayBuffer);
-                console.log('✅ PCM16 audio sent to OpenAI successfully, result:', result);
                 
-                // Try to get conversation state after sending audio
-                setTimeout(() => {
-                  try {
-                    // Check if session is still available (might be null if disconnected)
-                    if (!realtimeSession) {
-                      console.log('🔍 Session no longer available (disconnected)');
-                      return;
+                // Check session state less frequently for debugging
+                if (Math.random() < 0.001) { // Very rarely log session state
+                  setTimeout(() => {
+                    try {
+                      if (!realtimeSession) return;
+                      
+                      const session = realtimeSession as any;
+                      if (session && session.getState) {
+                        console.log('Session state check:', typeof session.getState());
+                      }
+                    } catch (e) {
+                      // Silently ignore session state check errors
                     }
-                    
-                    const session = realtimeSession as any;
-                    if (session && session.getState) {
-                      console.log('🔍 Session state after audio:', session.getState());
-                    }
-                    if (session && session.conversation) {
-                      console.log('🔍 Conversation state:', session.conversation);
-                    }
-                  } catch (e) {
-                    console.log('Could not get session state:', e);
-                  }
-                }, 100);
+                  }, 100);
+                }
                 
               } else {
                 console.error('sendAudio method not available on RealtimeSession');

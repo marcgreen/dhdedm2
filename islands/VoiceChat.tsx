@@ -221,7 +221,6 @@ export default function VoiceChat(_props: VoiceChatProps) {
     ws.onmessage = (event) => {
       try {
         const message = JSON.parse(event.data);
-        console.log('📨 WebSocket message received:', message.type, message);
         
         switch (message.type) {
         case 'connected':
@@ -238,23 +237,10 @@ export default function VoiceChat(_props: VoiceChatProps) {
           break;
           
         case 'audio':
-          // Play received audio
-          console.log('🔊 AUDIO MESSAGE RECEIVED!');
-          console.log('- Audio data length:', message.audio?.length);
-          console.log('- Audio data type:', typeof message.audio);
-          console.log('- Message debug info:', message.debug);
-          console.log('- Full message:', message);
-          
           if (message.audio) {
-            console.log('🎯 Attempting to play audio...');
-            try {
-              playAudio(message.audio);
-              console.log('✅ Audio playback initiated successfully');
-            } catch (error) {
-              console.error('❌ Error in playAudio:', error);
-            }
+            playAudio(message.audio);
           } else {
-            console.warn('❌ Received audio message but no audio data');
+            console.warn('Received audio message but no audio data');
           }
           break;
           
@@ -387,8 +373,6 @@ export default function VoiceChat(_props: VoiceChatProps) {
       const audioChunk = audioQueueRef.current.shift()!;
       const openAISampleRate = 24000;
       
-      console.log('🎵 Playing queued audio chunk, samples:', audioChunk.length);
-      
       // Create audio buffer at OpenAI's sample rate
       const audioBuffer = audioContextRef.current.createBuffer(
         1, // mono
@@ -413,18 +397,14 @@ export default function VoiceChat(_props: VoiceChatProps) {
       const duration = audioBuffer.duration;
       nextPlayTimeRef.current = startTime + duration;
       
-      console.log(`🔊 Playing audio chunk: ${duration.toFixed(3)}s, starting at: ${startTime.toFixed(3)}s`);
-      
       // Set up completion handler
       source.onended = () => {
-        console.log('✅ Audio chunk completed');
         isPlayingAudioRef.current = false;
         
         // Process next chunk in queue if available
         if (audioQueueRef.current.length > 0) {
           setTimeout(() => processAudioQueue(), 10); // Small delay to prevent stack overflow
         } else {
-          console.log('🎵 Audio queue empty, playback finished');
           nextPlayTimeRef.current = 0; // Reset for next conversation
         }
       };
@@ -433,7 +413,7 @@ export default function VoiceChat(_props: VoiceChatProps) {
       source.start(startTime);
       
     } catch (error) {
-      console.error('❌ Error processing audio queue:', error);
+      console.error('Error processing audio queue:', error);
       isPlayingAudioRef.current = false;
       // Try to process next chunk on error
       if (audioQueueRef.current.length > 0) {
@@ -448,13 +428,11 @@ export default function VoiceChat(_props: VoiceChatProps) {
     audioQueueRef.current = [];
     isPlayingAudioRef.current = false;
     nextPlayTimeRef.current = 0;
-    console.log('🔄 Audio queue cleared');
     
     // Disconnect the audio processor
     if (mediaRecorderRef.current) {
       try {
         (mediaRecorderRef.current as any).disconnect();
-        console.log('Audio processor disconnected');
       } catch (error) {
         console.error('Error disconnecting audio processor:', error);
       }
@@ -465,19 +443,14 @@ export default function VoiceChat(_props: VoiceChatProps) {
     if (audioContextRef.current && audioContextRef.current.state !== 'closed') {
       audioContextRef.current.close();
       audioContextRef.current = null;
-      console.log('Audio context closed');
     }
   };
 
   // Queue received PCM16 audio data for sequential playback
   const playAudio = async (base64Audio: string) => {
-    console.log('🎵 Queuing audio chunk, base64 length:', base64Audio.length);
-    
     try {
-      console.log('🔄 Decoding base64 audio data...');
       // Decode base64 to binary string
       const audioData = atob(base64Audio);
-      console.log('✅ Base64 decoded, binary length:', audioData.length);
       
       // Convert binary string to ArrayBuffer first
       const arrayBuffer = new ArrayBuffer(audioData.length);
@@ -490,34 +463,23 @@ export default function VoiceChat(_props: VoiceChatProps) {
       const dataView = new DataView(arrayBuffer);
       const sampleCount = arrayBuffer.byteLength / 2; // 2 bytes per 16-bit sample
       
-      console.log('📊 Audio chunk analysis:');
-      console.log('- Raw bytes:', arrayBuffer.byteLength);
-      console.log('- Sample count:', sampleCount);
-      console.log('- Expected duration at 24kHz:', (sampleCount / 24000).toFixed(3), 'seconds');
-      
       // Convert to Float32Array for AudioBuffer (PCM16 to Float32)
       const float32Data = new Float32Array(sampleCount);
       for (let i = 0; i < sampleCount; i++) {
         const int16Sample = dataView.getInt16(i * 2, true); // little-endian
         float32Data[i] = int16Sample / 32768.0; // Convert to float [-1, 1]
       }
-      console.log('✅ Float32 audio chunk created, samples:', float32Data.length);
       
       // Add to audio queue
       audioQueueRef.current.push(float32Data);
-      console.log(`📥 Audio chunk queued, queue length: ${audioQueueRef.current.length}`);
       
       // Start processing queue if not already playing
       if (!isPlayingAudioRef.current) {
-        console.log('🎬 Starting audio queue processing...');
         processAudioQueue();
-      } else {
-        console.log('🎵 Audio queue already processing, chunk added to queue');
       }
       
     } catch (error) {
-      console.error('❌ Error in playAudio function:', error);
-      console.error('❌ Error stack:', (error as Error).stack);
+      console.error('Error processing audio:', error);
     }
   };
 
