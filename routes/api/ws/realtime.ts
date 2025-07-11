@@ -228,7 +228,7 @@ export const handler: Handlers = {
 - Nutze 'roll_dice' für alle Würfelwürfe
 - Nutze 'manage_quests' für Aufgaben (add/complete/update)
 - Nutze 'track_language' für Sprachlernfortschritt
-- Nutze 'add_game_log' für wichtige Ereignisse
+- Nutze 'add_game_log' für wichtige Ereignisse (z.B. "Hans betritt die Taverne", "Kampf mit Goblins beginnt", "Quest abgeschlossen")
 
 Starte mit einer freundlichen Begrüßung und frage nach dem Namen des Charakters. Nutze dann die Tools, um die Charaktererstellung zu verwalten und das Abenteuer zu beginnen!`,
                 tools: tools,
@@ -288,6 +288,23 @@ Starte mit einer freundlichen Begrüßung und frage nach dem Namen des Charakter
               // Listen for conversation history updates (documented API)
               realtimeSession.on('history_updated', (history: any) => {
                 console.log('Conversation history updated, sending to client');
+                
+                // Debug: Log the structure to see if tool calls are included
+                if (history && Array.isArray(history)) {
+                  const toolCalls = history.filter((item: any) => 
+                    item.type === 'function_call' || item.type === 'tool_call'
+                  );
+                  if (toolCalls.length > 0) {
+                    console.log('Found tool calls in history:', toolCalls.map((tc: any) => ({
+                      type: tc.type,
+                      name: tc.name,
+                      status: tc.status,
+                      arguments: tc.arguments,
+                      output: tc.output
+                    })));
+                  }
+                }
+                
                 socket.send(JSON.stringify({
                   type: 'history_updated',
                   history: history

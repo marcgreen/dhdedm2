@@ -105,7 +105,7 @@ export default function VoiceChat(_props: VoiceChatProps) {
       });
   }, []);
 
-  // Helper function to log tool calls
+  // Helper function to log tool calls and update game state
   const logToolCall = (toolName: string, parameters: any, result: string) => {
     const newState = { ...gameState.value };
     const toolCall: ToolCall = {
@@ -115,6 +115,81 @@ export default function VoiceChat(_props: VoiceChatProps) {
       result
     };
     newState.toolCallLog.push(toolCall);
+    
+    // Update game state based on tool calls
+    switch (toolName) {
+      case 'update_character':
+        if (parameters.name) newState.character.name = parameters.name;
+        if (parameters.level) newState.character.level = parameters.level;
+        if (parameters.hitPoints !== undefined) newState.character.hitPoints = parameters.hitPoints;
+        if (parameters.maxHitPoints) newState.character.maxHitPoints = parameters.maxHitPoints;
+        if (parameters.location) newState.character.currentLocation = parameters.location;
+        if (parameters.attributes) {
+          newState.character.attributes = { ...newState.character.attributes, ...parameters.attributes };
+        }
+        break;
+        
+      case 'update_inventory':
+        if (parameters.action === 'add' && parameters.items) {
+          parameters.items.forEach((item: string) => {
+            if (!newState.character.inventory.includes(item)) {
+              newState.character.inventory.push(item);
+            }
+          });
+        } else if (parameters.action === 'remove' && parameters.items) {
+          parameters.items.forEach((item: string) => {
+            const index = newState.character.inventory.indexOf(item);
+            if (index > -1) {
+              newState.character.inventory.splice(index, 1);
+            }
+          });
+        }
+        break;
+        
+      case 'update_scene':
+        if (parameters.scene) newState.currentScene = parameters.scene;
+        if (parameters.description) newState.sceneDescription = parameters.description;
+        if (parameters.location) newState.character.currentLocation = parameters.location;
+        break;
+        
+      case 'manage_quests':
+        if (parameters.action === 'add' && parameters.quest) {
+          if (!newState.activeQuests.includes(parameters.quest)) {
+            newState.activeQuests.push(parameters.quest);
+          }
+        } else if (parameters.action === 'complete' && parameters.quest) {
+          const index = newState.activeQuests.indexOf(parameters.quest);
+          if (index > -1) {
+            newState.activeQuests.splice(index, 1);
+          }
+        } else if (parameters.action === 'update' && parameters.quest && parameters.index !== undefined) {
+          if (newState.activeQuests[parameters.index]) {
+            newState.activeQuests[parameters.index] = parameters.quest;
+          }
+        }
+        break;
+        
+      case 'track_language':
+        if (parameters.corrections) {
+          newState.languageCorrections += parameters.corrections;
+        }
+        if (parameters.newVocabulary && Array.isArray(parameters.newVocabulary)) {
+          parameters.newVocabulary.forEach((word: string) => {
+            if (!newState.vocabularyIntroduced.includes(word)) {
+              newState.vocabularyIntroduced.push(word);
+            }
+          });
+        }
+        break;
+        
+      case 'add_game_log':
+        if (parameters.entry) {
+          const timestamp = new Date().toLocaleTimeString();
+          newState.gameLog.push(`[${timestamp}] ${parameters.entry}`);
+        }
+        break;
+    }
+    
     gameState.value = newState;
     console.log(`Tool Called: ${toolName}`, { parameters, result });
   };
@@ -124,7 +199,15 @@ export default function VoiceChat(_props: VoiceChatProps) {
     const newState = { ...gameState.value };
     const formattedHistory: ConversationItem[] = [];
     
+    // Debug: Log the raw history to see what we're getting
+    console.log('Raw conversation history:', history);
+    
     history.forEach((item: any) => {
+      // Debug: Log each item to see its structure
+      if (item.type === 'function_call' || item.type === 'tool_call') {
+        console.log('Found tool call in history:', item);
+      }
+      
       if (item.type === 'message') {
         let content = '';
         
@@ -186,14 +269,22 @@ export default function VoiceChat(_props: VoiceChatProps) {
         }
       }
       
-      // Also show function calls in the conversation for transparency
-      else if (item.type === 'function_call' && item.status === 'completed') {
+      // Handle function calls and tool calls in the conversation history
+      else if ((item.type === 'function_call' || item.type === 'tool_call') && item.status === 'completed') {
+        const toolName = item.name || item.function_name || 'unknown';
+        const params = item.arguments || item.parameters || {};
+        const output = item.output || item.result || 'No output';
+        
+        // Add to conversation history for display
         formattedHistory.push({
           timestamp: new Date().toLocaleTimeString(),
           role: 'assistant',
-          content: `🔧 Called tool: ${item.name}(${item.arguments}) → ${item.output}`,
+          content: `🔧 Called tool: ${toolName}(${JSON.stringify(params)}) → ${output}`,
           type: 'message'
         });
+        
+        // Also add to tool call log
+        logToolCall(toolName, params, output);
       }
     });
     
