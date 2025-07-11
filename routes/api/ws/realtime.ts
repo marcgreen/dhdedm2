@@ -142,22 +142,7 @@ const createGameStateTools = () => {
     },
   });
 
-  const addGameLogTool = tool({
-    name: 'add_game_log',
-    description: 'Add important events to the game log',
-    strict: false,
-    parameters: {
-      type: 'object',
-      properties: {
-        entry: { type: 'string' },
-      },
-      required: ['entry'],
-      additionalProperties: true,
-    },
-    async execute(args: any) {
-      return `Log entry added: ${args.entry}`;
-    },
-  });
+
 
   return [
     updateCharacterTool,
@@ -166,7 +151,6 @@ const createGameStateTools = () => {
     rollDiceTool,
     manageQuestsTool,
     trackLanguageTool,
-    addGameLogTool,
   ];
 };
 

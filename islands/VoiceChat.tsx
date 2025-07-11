@@ -27,20 +27,13 @@ interface GameState {
   currentScene: string;
   sceneDescription: string;
   activeQuests: string[];
-  gameLog: string[];
-  toolCallLog: ToolCall[];
   conversationHistory: ConversationItem[];
   sessionId: string;
   languageCorrections: number;
   vocabularyIntroduced: string[];
 }
 
-interface ToolCall {
-  timestamp: string;
-  toolName: string;
-  parameters: any;
-  result: string;
-}
+
 
 interface ConversationItem {
   timestamp: string;
@@ -82,8 +75,7 @@ export default function VoiceChat(_props: VoiceChatProps) {
     currentScene: "Character Creation",
     sceneDescription: "Du stehst am Beginn eines neuen Abenteuers...",
     activeQuests: [],
-    gameLog: [],
-    toolCallLog: [],
+
     conversationHistory: [],
     sessionId: "",
     languageCorrections: 0,
@@ -105,16 +97,9 @@ export default function VoiceChat(_props: VoiceChatProps) {
       });
   }, []);
 
-  // Helper function to log tool calls and update game state
-  const logToolCall = (toolName: string, parameters: any, result: string) => {
+  // Helper function to update game state based on tool calls
+  const updateGameState = (toolName: string, parameters: any) => {
     const newState = { ...gameState.value };
-    const toolCall: ToolCall = {
-      timestamp: new Date().toLocaleTimeString(),
-      toolName,
-      parameters,
-      result
-    };
-    newState.toolCallLog.push(toolCall);
     
     // Update game state based on tool calls
     switch (toolName) {
@@ -181,17 +166,10 @@ export default function VoiceChat(_props: VoiceChatProps) {
           });
         }
         break;
-        
-      case 'add_game_log':
-        if (parameters.entry) {
-          const timestamp = new Date().toLocaleTimeString();
-          newState.gameLog.push(`[${timestamp}] ${parameters.entry}`);
-        }
-        break;
     }
     
     gameState.value = newState;
-    console.log(`Tool Called: ${toolName}`, { parameters, result });
+    console.log(`Tool Called: ${toolName}`, { parameters });
   };
 
   // Helper function to update conversation history
@@ -283,8 +261,8 @@ export default function VoiceChat(_props: VoiceChatProps) {
           type: 'message'
         });
         
-        // Also add to tool call log
-        logToolCall(toolName, params, output);
+        // Update game state
+        updateGameState(toolName, params);
       }
     });
     
@@ -335,13 +313,12 @@ export default function VoiceChat(_props: VoiceChatProps) {
           }
           break;
           
-        case 'tool_executed':
+                  case 'tool_executed':
           // Handle tool execution results
           if (message.result) {
             const toolName = message.result.name || 'unknown';
             const params = message.result.parameters || {};
-            const output = message.result.output || '';
-            logToolCall(toolName, params, output);
+            updateGameState(toolName, params);
           }
           break;
           
@@ -818,9 +795,8 @@ export default function VoiceChat(_props: VoiceChatProps) {
         </div>
       </div>
 
-      {/* Conversation and Logs Section */}
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Conversation Transcript */}
+      {/* Conversation Section */}
+      <div class="max-w-4xl mx-auto">
         <div class="bg-slate-800 p-6 rounded-xl shadow-xl">
           <h2 class="text-xl font-bold text-white mb-4 flex items-center">
             💬 Unterhaltung
@@ -849,52 +825,6 @@ export default function VoiceChat(_props: VoiceChatProps) {
               ))
             ) : (
               <div class="text-gray-500 italic">Noch keine Unterhaltung...</div>
-            )}
-          </div>
-        </div>
-
-        {/* Tool Calls Log */}
-        <div class="bg-slate-800 p-6 rounded-xl shadow-xl">
-          <h2 class="text-xl font-bold text-white mb-4 flex items-center">
-            🔧 Tool-Aufrufe
-            <span class="ml-2 text-sm text-gray-400">({gameState.value.toolCallLog.length})</span>
-          </h2>
-          <div class="space-y-2 text-sm max-h-64 overflow-y-auto">
-            {gameState.value.toolCallLog.length > 0 ? (
-              gameState.value.toolCallLog.slice(-15).map((call, index) => (
-                <div key={index} class="bg-slate-700 p-3 rounded border-l-2 border-blue-500">
-                  <div class="flex justify-between items-start mb-1">
-                    <span class="text-blue-400 font-mono text-xs">{call.toolName}</span>
-                    <span class="text-gray-500 text-xs">{call.timestamp}</span>
-                  </div>
-                  <div class="text-gray-300 text-xs mb-1">
-                    <strong>Args:</strong> {JSON.stringify(call.parameters)}
-                  </div>
-                  <div class="text-green-300 text-xs">
-                    <strong>Result:</strong> {call.result}
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div class="text-gray-500 italic">Noch keine Tool-Aufrufe...</div>
-            )}
-          </div>
-        </div>
-
-        {/* Game Log */}
-        <div class="bg-slate-800 p-6 rounded-xl shadow-xl">
-          <h2 class="text-xl font-bold text-white mb-4 flex items-center">
-            📜 Spielprotokoll
-          </h2>
-          <div class="space-y-2 text-sm max-h-64 overflow-y-auto">
-            {gameState.value.gameLog.length > 0 ? (
-              gameState.value.gameLog.slice(-10).map((entry, index) => (
-                <div key={index} class="text-gray-300 text-xs border-l-2 border-slate-600 pl-2">
-                  {entry}
-                </div>
-              ))
-            ) : (
-              <div class="text-gray-500 italic">Noch keine Einträge...</div>
             )}
           </div>
         </div>
