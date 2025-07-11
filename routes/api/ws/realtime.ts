@@ -284,8 +284,17 @@ Starte mit einer freundlichen Begrüßung und frage nach dem Namen des Charakter
                   console.log('Audio event received but no data found');
                 }
               });
+
+              // Listen for conversation history updates (documented API)
+              realtimeSession.on('history_updated', (history: any) => {
+                console.log('Conversation history updated, sending to client');
+                socket.send(JSON.stringify({
+                  type: 'history_updated',
+                  history: history
+                }));
+              });
               
-              console.log('✅ Audio event listener set up successfully');
+              console.log('✅ Audio and conversation event listeners set up successfully');
 
               // Connect to OpenAI using WebSocket transport
               console.log('Connecting to OpenAI Realtime API via WebSocket...');
