@@ -233,7 +233,12 @@ export default function VoiceChat(_props: VoiceChatProps) {
           
         case 'audio':
           // Play received audio
-          playAudio(message.audio);
+          console.log('Received audio from server, length:', message.audio?.length);
+          if (message.audio) {
+            playAudio(message.audio);
+          } else {
+            console.warn('Received audio message but no audio data');
+          }
           break;
           
         case 'tool_executed':
@@ -296,8 +301,8 @@ export default function VoiceChat(_props: VoiceChatProps) {
         } 
       });
 
-      // Create audio context using browser's default sample rate
-      audioContextRef.current = new AudioContext();
+      // Create audio context with 24kHz sample rate to match Realtime API
+      audioContextRef.current = new AudioContext({ sampleRate: 24000 });
       console.log('Audio context sample rate:', audioContextRef.current.sampleRate);
       const source = audioContextRef.current.createMediaStreamSource(stream);
       
@@ -364,28 +369,49 @@ export default function VoiceChat(_props: VoiceChatProps) {
     }
   };
 
-  // Play received audio
+  // Play received PCM16 audio data
   const playAudio = async (base64Audio: string) => {
     try {
       if (!audioContextRef.current) {
-        audioContextRef.current = new AudioContext();
+        // Create audio context with 24kHz sample rate to match OpenAI Realtime API
+        audioContextRef.current = new AudioContext({ sampleRate: 24000 });
       }
       
+      // Decode base64 to binary string
       const audioData = atob(base64Audio);
-      const arrayBuffer = new ArrayBuffer(audioData.length);
-      const view = new Uint8Array(arrayBuffer);
       
-      for (let i = 0; i < audioData.length; i++) {
-        view[i] = audioData.charCodeAt(i);
+      // Convert binary string to Int16Array (PCM16 format)
+      const pcm16Data = new Int16Array(audioData.length / 2);
+      for (let i = 0; i < pcm16Data.length; i++) {
+        const byte1 = audioData.charCodeAt(i * 2);
+        const byte2 = audioData.charCodeAt(i * 2 + 1);
+        // Combine two bytes to form a 16-bit signed integer (little-endian)
+        pcm16Data[i] = byte1 | (byte2 << 8);
+        if (pcm16Data[i] > 32767) pcm16Data[i] -= 65536; // Convert to signed
       }
       
-      const audioBuffer = await audioContextRef.current.decodeAudioData(arrayBuffer);
+      // Create audio buffer for PCM16 data
+      const audioBuffer = audioContextRef.current.createBuffer(
+        1, // mono
+        pcm16Data.length,
+        24000 // 24kHz sample rate
+      );
+      
+      // Copy PCM16 data to audio buffer, converting to float32
+      const channelData = audioBuffer.getChannelData(0);
+      for (let i = 0; i < pcm16Data.length; i++) {
+        channelData[i] = pcm16Data[i] / 32768.0; // Convert int16 to float32 [-1, 1]
+      }
+      
+      // Play the audio buffer
       const source = audioContextRef.current.createBufferSource();
       source.buffer = audioBuffer;
       source.connect(audioContextRef.current.destination);
       source.start();
+      
+      console.log(`Playing audio: ${pcm16Data.length} samples, ${(pcm16Data.length / 24000).toFixed(2)}s duration`);
     } catch (error) {
-      console.error('Error playing audio:', error);
+      console.error('Error playing PCM16 audio:', error);
     }
   };
 

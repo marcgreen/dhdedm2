@@ -247,69 +247,11 @@ Starte mit einer freundlichen Begrüßung und frage nach dem Namen des Charakter
               });
               console.log('RealtimeSession created successfully');
 
-              // Set up event forwarding to client with enhanced logging
-              console.log('Setting up RealtimeSession event listeners...');
-              if (realtimeSession) {
-                console.log('RealtimeSession type:', typeof realtimeSession);
-                console.log('RealtimeSession keys:', Object.keys(realtimeSession));
-                console.log('RealtimeSession prototype methods:', Object.getOwnPropertyNames(Object.getPrototypeOf(realtimeSession)));
-              }
+              // Set up RealtimeSession for audio streaming
+              console.log('RealtimeSession created successfully, starting audio stream handling');
               
-              // Try to listen for common events that might exist
-              const commonEvents = [
-                'audio', 'response', 'message', 'conversation.item.created', 
-                'response.audio', 'response.audio.delta', 'conversation.item.completed',
-                'conversation.updated', 'session.updated', 'input_audio_buffer.speech_started',
-                'input_audio_buffer.speech_stopped', 'response.created', 'response.done'
-              ];
-              
-              if (realtimeSession) {
-                commonEvents.forEach(eventName => {
-                  try {
-                    realtimeSession!.on(eventName as any, (data: any) => {
-                    console.log(`Event received: ${eventName}`, typeof data, Object.keys(data || {}));
-                    
-                    // Handle audio events
-                    if (eventName.includes('audio') && data) {
-                      const audioData = data?.data || data?.audio || data;
-                      if (audioData) {
-                        try {
-                          // Convert ArrayBuffer to base64 for transmission
-                          let base64Audio;
-                          if (audioData instanceof ArrayBuffer) {
-                            base64Audio = btoa(String.fromCharCode(...new Uint8Array(audioData)));
-                          } else if (audioData.buffer) {
-                            base64Audio = btoa(String.fromCharCode(...new Uint8Array(audioData.buffer)));
-                          } else if (typeof audioData === 'string') {
-                            base64Audio = audioData; // Already base64?
-                          }
-                          
-                          if (base64Audio) {
-                            console.log('Forwarding audio response to client, length:', base64Audio.length);
-                            socket.send(JSON.stringify({ 
-                              type: 'audio', 
-                              audio: base64Audio
-                            }));
-                          }
-                        } catch (error) {
-                          console.error('Error processing audio event:', error);
-                        }
-                      }
-                    }
-                    
-                    // Forward all events to client for debugging
-                    socket.send(JSON.stringify({
-                      type: 'realtime_event',
-                      eventName,
-                      data
-                    }));
-                  });
-                  console.log(`Successfully registered listener for: ${eventName}`);
-                  } catch (error) {
-                    console.log(`Failed to register listener for ${eventName}:`, error);
-                  }
-                });
-              }
+              // Note: The RealtimeSession from Agents SDK handles most events internally
+              // We'll rely on sendAudio for input and monitor for any available output events
 
               // Connect to OpenAI using WebSocket transport
               console.log('Connecting to OpenAI Realtime API via WebSocket...');
@@ -394,13 +336,13 @@ Starte mit einer freundlichen Begrüßung und frage nach dem Namen des Charakter
           case 'disconnect':
             if (realtimeSession) {
               try {
-                if (typeof realtimeSession.close === 'function') {
-                  await realtimeSession.close();
-                } else if (typeof realtimeSession.stop === 'function') {
-                  await realtimeSession.stop();
+                if (typeof (realtimeSession as any).close === 'function') {
+                  await (realtimeSession as any).close();
+                } else if (typeof (realtimeSession as any).disconnect === 'function') {
+                  await (realtimeSession as any).disconnect();
                 }
               } catch (error) {
-                console.error('Error closing session:', error);
+                console.error('Error closing session:', error as Error);
               }
               
               if (sessionId) {
@@ -415,7 +357,7 @@ Starte mit einer freundlichen Begrüßung und frage nach dem Namen des Charakter
         console.error('WebSocket message error:', error);
         socket.send(JSON.stringify({ 
           type: 'error', 
-          error: error.message 
+          error: (error as Error).message 
         }));
       }
     };
