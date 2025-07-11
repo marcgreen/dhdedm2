@@ -404,35 +404,54 @@ export default function VoiceChat(_props: VoiceChatProps) {
       const audioData = atob(base64Audio);
       console.log('✅ Base64 decoded, binary length:', audioData.length);
       
-      // Convert binary string to Int16Array (PCM16 format)
-      const pcm16Data = new Int16Array(audioData.length / 2);
-      for (let i = 0; i < pcm16Data.length; i++) {
-        const byte1 = audioData.charCodeAt(i * 2);
-        const byte2 = audioData.charCodeAt(i * 2 + 1);
-        // Combine two bytes to form a 16-bit signed integer (little-endian)
-        pcm16Data[i] = byte1 | (byte2 << 8);
-        if (pcm16Data[i] > 32767) pcm16Data[i] -= 65536; // Convert to signed
+      // Convert binary string to ArrayBuffer first
+      const arrayBuffer = new ArrayBuffer(audioData.length);
+      const uint8View = new Uint8Array(arrayBuffer);
+      for (let i = 0; i < audioData.length; i++) {
+        uint8View[i] = audioData.charCodeAt(i);
       }
-      console.log('✅ PCM16 data created, samples:', pcm16Data.length);
+      
+      // Create DataView for proper endian handling
+      const dataView = new DataView(arrayBuffer);
+      const sampleCount = arrayBuffer.byteLength / 2; // 2 bytes per 16-bit sample
+      
+      console.log('📊 Audio data analysis:');
+      console.log('- Raw bytes:', arrayBuffer.byteLength);
+      console.log('- Sample count:', sampleCount);
+      console.log('- Expected duration at 24kHz:', (sampleCount / 24000).toFixed(3), 'seconds');
+      
+      // Log first few samples for debugging
+      const firstSamples = [];
+      for (let i = 0; i < Math.min(10, sampleCount); i++) {
+        const sample = dataView.getInt16(i * 2, true); // little-endian
+        firstSamples.push(sample);
+      }
+      console.log('- First 10 samples:', firstSamples);
+      
+      // Convert to Float32Array for AudioBuffer (PCM16 to Float32)
+      const float32Data = new Float32Array(sampleCount);
+      for (let i = 0; i < sampleCount; i++) {
+        const int16Sample = dataView.getInt16(i * 2, true); // little-endian
+        float32Data[i] = int16Sample / 32768.0; // Convert to float [-1, 1]
+      }
+      console.log('✅ Float32 audio data created, samples:', float32Data.length);
       
       // OpenAI Realtime API sends audio at 24kHz, so use that sample rate
       const openAISampleRate = 24000;
       console.log('🎯 Creating audio buffer with OpenAI sample rate:', openAISampleRate);
       console.log('🎧 Browser AudioContext sample rate:', audioContextRef.current.sampleRate);
       
-      // Create audio buffer for PCM16 data at the correct source sample rate
+      // Create audio buffer for audio data at the correct source sample rate
       const audioBuffer = audioContextRef.current.createBuffer(
         1, // mono
-        pcm16Data.length,
+        float32Data.length,
         openAISampleRate // Use OpenAI's 24kHz sample rate
       );
       
-      // Copy PCM16 data to audio buffer, converting to float32
+      // Copy float32 data directly to audio buffer
       const channelData = audioBuffer.getChannelData(0);
-      for (let i = 0; i < pcm16Data.length; i++) {
-        channelData[i] = pcm16Data[i] / 32768.0; // Convert int16 to float32 [-1, 1]
-      }
-      console.log('✅ Audio buffer filled with converted PCM16 data');
+      channelData.set(float32Data);
+      console.log('✅ Audio buffer filled with float32 data');
       
       // Play the audio buffer
       console.log('🔊 Starting audio playback...');
@@ -448,8 +467,8 @@ export default function VoiceChat(_props: VoiceChatProps) {
       source.start();
       console.log('🎵 Audio source started successfully');
       
-      const durationSeconds = pcm16Data.length / openAISampleRate;
-      console.log(`📊 Audio info: ${pcm16Data.length} samples, ${durationSeconds.toFixed(2)}s duration at ${openAISampleRate}Hz`);
+      const durationSeconds = float32Data.length / openAISampleRate;
+      console.log(`📊 Audio info: ${float32Data.length} samples, ${durationSeconds.toFixed(2)}s duration at ${openAISampleRate}Hz`);
       
     } catch (error) {
       console.error('❌ Error in playAudio function:', error);
