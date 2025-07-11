@@ -268,14 +268,26 @@ Starte mit einer freundlichen Begrüßung und frage nach dem Namen des Charakter
                      console.log(`🎵 RealtimeSession event emitted: ${eventName}`, eventData);
                      
                      // Check for audio-related events - look in both event name and event data
-                     const eventStr = eventName.toLowerCase();
-                     const isAudioEvent = eventStr.includes('audio') || eventStr.includes('response') || eventStr.includes('delta') ||
-                                          (eventData && typeof eventData === 'object' && (
-                                            eventData.type?.includes('audio') || 
-                                            eventData.type?.includes('response') ||
-                                            eventData.audio ||
-                                            eventData.delta
-                                          ));
+                     let isAudioEvent = false;
+                     
+                     // Safely check event name/string
+                     if (typeof eventName === 'string' && eventName.length > 0) {
+                       const eventStr = eventName.toLowerCase();
+                       isAudioEvent = eventStr.includes('audio') || eventStr.includes('response') || eventStr.includes('delta');
+                     }
+                     
+                     // Also check event data structure
+                     if (!isAudioEvent && eventData && typeof eventData === 'object') {
+                       isAudioEvent = !!(
+                         (eventData.type && typeof eventData.type === 'string' && (
+                           eventData.type.includes('audio') || 
+                           eventData.type.includes('response') ||
+                           eventData.type.includes('delta')
+                         )) ||
+                         eventData.audio ||
+                         eventData.delta
+                       );
+                     }
                      
                      if (isAudioEvent) {
                        console.log(`🔊 AUDIO EVENT DETECTED: ${eventName}`, eventData);
