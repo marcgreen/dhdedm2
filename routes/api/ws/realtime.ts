@@ -247,11 +247,92 @@ Starte mit einer freundlichen Begrüßung und frage nach dem Namen des Charakter
               });
               console.log('RealtimeSession created successfully');
 
-              // Set up RealtimeSession for audio streaming
-              console.log('RealtimeSession created successfully, starting audio stream handling');
+              // Set up comprehensive audio response debugging
+              console.log('RealtimeSession created successfully, setting up audio response monitoring');
               
-              // Note: The RealtimeSession from Agents SDK handles most events internally
-              // We'll rely on sendAudio for input and monitor for any available output events
+              // Add debug logging for all possible events
+              const realtimeSessionAny = realtimeSession as any;
+              
+              // Try to listen for audio-related events
+              if (typeof realtimeSessionAny.on === 'function') {
+                console.log('RealtimeSession has event emitter capabilities');
+                
+                // Listen for all events to debug what's available
+                const originalEmit = realtimeSessionAny.emit;
+                if (originalEmit) {
+                  realtimeSessionAny.emit = function(eventName: string, ...args: any[]) {
+                    console.log(`🎵 RealtimeSession event emitted: ${eventName}`, args.length > 0 ? args[0] : 'no data');
+                    
+                    // Check for audio-related events
+                    if (eventName.includes('audio') || eventName.includes('response') || eventName.includes('delta')) {
+                      console.log(`🔊 AUDIO EVENT DETECTED: ${eventName}`, args);
+                      
+                      // Try to extract and forward audio data
+                      if (args && args.length > 0) {
+                        const eventData = args[0];
+                        console.log('Audio event data structure:', Object.keys(eventData || {}));
+                        
+                        // Look for audio data in various possible locations
+                        const audioData = eventData?.audio || eventData?.delta || eventData?.data || eventData;
+                        if (audioData) {
+                          console.log('🎯 Found audio data, type:', typeof audioData, 'length:', audioData.length || 'no length');
+                          
+                          try {
+                            let base64Audio;
+                            if (typeof audioData === 'string') {
+                              base64Audio = audioData;
+                            } else if (audioData instanceof ArrayBuffer) {
+                              base64Audio = btoa(String.fromCharCode(...new Uint8Array(audioData)));
+                            } else if (audioData instanceof Uint8Array) {
+                              base64Audio = btoa(String.fromCharCode(...audioData));
+                            }
+                            
+                            if (base64Audio) {
+                              console.log('📤 Forwarding audio to client, length:', base64Audio.length);
+                              socket.send(JSON.stringify({ 
+                                type: 'audio', 
+                                audio: base64Audio,
+                                debug: { eventName, dataType: typeof audioData }
+                              }));
+                            }
+                          } catch (error) {
+                            console.error('Error processing audio data:', error);
+                          }
+                        }
+                      }
+                    }
+                    
+                    return originalEmit.apply(this, arguments);
+                  };
+                }
+                
+                // Also try direct event listeners for common patterns
+                const audioEvents = ['audio', 'response.audio', 'response.audio.delta', 'conversation.item.created'];
+                audioEvents.forEach(eventName => {
+                  try {
+                    realtimeSessionAny.on(eventName, (data: any) => {
+                      console.log(`🎧 Direct listener caught: ${eventName}`, data);
+                    });
+                  } catch (e) {
+                    // Event doesn't exist, that's OK
+                  }
+                });
+              }
+              
+              // Monitor the underlying transport for responses
+              if (realtimeSessionAny.transport || realtimeSessionAny._transport) {
+                const transport = realtimeSessionAny.transport || realtimeSessionAny._transport;
+                console.log('Found transport object:', typeof transport);
+                
+                if (transport && typeof transport.on === 'function') {
+                  transport.on('*', (eventName: string, data: any) => {
+                    console.log(`🚌 Transport event: ${eventName}`, data);
+                    if (eventName.includes('audio')) {
+                      console.log('🔊 Transport audio event detected!', data);
+                    }
+                  });
+                }
+              }
 
               // Connect to OpenAI using WebSocket transport
               console.log('Connecting to OpenAI Realtime API via WebSocket...');
@@ -313,8 +394,25 @@ Starte mit einer freundlichen Begrüßung und frage nach dem Namen des Charakter
               
               // Send PCM16 audio to OpenAI Realtime API
               if (typeof realtimeSession.sendAudio === 'function') {
-                await realtimeSession.sendAudio(arrayBuffer);
-                console.log('PCM16 audio sent to OpenAI successfully');
+                console.log('📤 Sending audio to RealtimeSession, bytes:', arrayBuffer.byteLength);
+                const result = await realtimeSession.sendAudio(arrayBuffer);
+                console.log('✅ PCM16 audio sent to OpenAI successfully, result:', result);
+                
+                // Try to get conversation state after sending audio
+                setTimeout(() => {
+                  try {
+                    const session = realtimeSession as any;
+                    if (session.getState) {
+                      console.log('🔍 Session state after audio:', session.getState());
+                    }
+                    if (session.conversation) {
+                      console.log('🔍 Conversation state:', session.conversation);
+                    }
+                  } catch (e) {
+                    console.log('Could not get session state:', e);
+                  }
+                }, 100);
+                
               } else {
                 console.error('sendAudio method not available on RealtimeSession');
                 socket.send(JSON.stringify({ 

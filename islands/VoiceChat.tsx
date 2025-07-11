@@ -216,6 +216,7 @@ export default function VoiceChat(_props: VoiceChatProps) {
     ws.onmessage = (event) => {
       try {
         const message = JSON.parse(event.data);
+        console.log('📨 WebSocket message received:', message.type, message);
         
         switch (message.type) {
         case 'connected':
@@ -233,11 +234,22 @@ export default function VoiceChat(_props: VoiceChatProps) {
           
         case 'audio':
           // Play received audio
-          console.log('Received audio from server, length:', message.audio?.length);
+          console.log('🔊 AUDIO MESSAGE RECEIVED!');
+          console.log('- Audio data length:', message.audio?.length);
+          console.log('- Audio data type:', typeof message.audio);
+          console.log('- Message debug info:', message.debug);
+          console.log('- Full message:', message);
+          
           if (message.audio) {
-            playAudio(message.audio);
+            console.log('🎯 Attempting to play audio...');
+            try {
+              playAudio(message.audio);
+              console.log('✅ Audio playback initiated successfully');
+            } catch (error) {
+              console.error('❌ Error in playAudio:', error);
+            }
           } else {
-            console.warn('Received audio message but no audio data');
+            console.warn('❌ Received audio message but no audio data');
           }
           break;
           
@@ -371,14 +383,26 @@ export default function VoiceChat(_props: VoiceChatProps) {
 
   // Play received PCM16 audio data
   const playAudio = async (base64Audio: string) => {
+    console.log('🎵 playAudio() called with base64 length:', base64Audio.length);
+    
     try {
       if (!audioContextRef.current) {
-        // Create audio context with 24kHz sample rate to match OpenAI Realtime API
-        audioContextRef.current = new AudioContext({ sampleRate: 24000 });
+        console.log('🎧 Creating new AudioContext...');
+        // Create audio context using browser's default sample rate
+        audioContextRef.current = new AudioContext();
+        console.log('✅ AudioContext created, sample rate:', audioContextRef.current.sampleRate);
       }
       
+      // Resume audio context if suspended (required by some browsers)
+      if (audioContextRef.current.state === 'suspended') {
+        console.log('🔄 Resuming suspended AudioContext...');
+        await audioContextRef.current.resume();
+      }
+      
+      console.log('🔄 Decoding base64 audio data...');
       // Decode base64 to binary string
       const audioData = atob(base64Audio);
+      console.log('✅ Base64 decoded, binary length:', audioData.length);
       
       // Convert binary string to Int16Array (PCM16 format)
       const pcm16Data = new Int16Array(audioData.length / 2);
@@ -389,12 +413,17 @@ export default function VoiceChat(_props: VoiceChatProps) {
         pcm16Data[i] = byte1 | (byte2 << 8);
         if (pcm16Data[i] > 32767) pcm16Data[i] -= 65536; // Convert to signed
       }
+      console.log('✅ PCM16 data created, samples:', pcm16Data.length);
+      
+      // Use browser's default sample rate for the audio buffer
+      const sampleRate = audioContextRef.current.sampleRate;
+      console.log('🎯 Creating audio buffer with sample rate:', sampleRate);
       
       // Create audio buffer for PCM16 data
       const audioBuffer = audioContextRef.current.createBuffer(
         1, // mono
         pcm16Data.length,
-        24000 // 24kHz sample rate
+        sampleRate // Use browser's default sample rate
       );
       
       // Copy PCM16 data to audio buffer, converting to float32
@@ -402,16 +431,28 @@ export default function VoiceChat(_props: VoiceChatProps) {
       for (let i = 0; i < pcm16Data.length; i++) {
         channelData[i] = pcm16Data[i] / 32768.0; // Convert int16 to float32 [-1, 1]
       }
+      console.log('✅ Audio buffer filled with converted PCM16 data');
       
       // Play the audio buffer
+      console.log('🔊 Starting audio playback...');
       const source = audioContextRef.current.createBufferSource();
       source.buffer = audioBuffer;
       source.connect(audioContextRef.current.destination);
-      source.start();
       
-      console.log(`Playing audio: ${pcm16Data.length} samples, ${(pcm16Data.length / 24000).toFixed(2)}s duration`);
+      // Add event listeners for debugging
+      source.onended = () => {
+        console.log('✅ Audio playback completed');
+      };
+      
+      source.start();
+      console.log('🎵 Audio source started successfully');
+      
+      const durationSeconds = pcm16Data.length / sampleRate;
+      console.log(`📊 Audio info: ${pcm16Data.length} samples, ${durationSeconds.toFixed(2)}s duration at ${sampleRate}Hz`);
+      
     } catch (error) {
-      console.error('Error playing PCM16 audio:', error);
+      console.error('❌ Error in playAudio function:', error);
+      console.error('❌ Error stack:', (error as Error).stack);
     }
   };
 
