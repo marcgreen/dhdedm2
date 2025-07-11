@@ -367,11 +367,17 @@ Starte mit einer freundlichen Begrüßung und frage nach dem Namen des Charakter
                 // Try to get conversation state after sending audio
                 setTimeout(() => {
                   try {
+                    // Check if session is still available (might be null if disconnected)
+                    if (!realtimeSession) {
+                      console.log('🔍 Session no longer available (disconnected)');
+                      return;
+                    }
+                    
                     const session = realtimeSession as any;
-                    if (session.getState) {
+                    if (session && session.getState) {
                       console.log('🔍 Session state after audio:', session.getState());
                     }
-                    if (session.conversation) {
+                    if (session && session.conversation) {
                       console.log('🔍 Conversation state:', session.conversation);
                     }
                   } catch (e) {
