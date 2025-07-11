@@ -247,19 +247,44 @@ Starte mit einer freundlichen Begrüßung und frage nach dem Namen des Charakter
               });
               console.log('RealtimeSession created successfully');
 
-              // Set up event forwarding to client
+              // Set up event forwarding to client with enhanced logging
+              console.log('Setting up RealtimeSession event listeners...');
+              
               realtimeSession.on('history_updated', (history) => {
+                console.log('History updated event received');
                 socket.send(JSON.stringify({ 
                   type: 'history_updated', 
                   history 
                 }));
               });
 
-              realtimeSession.on('audio', (audio) => {
-                socket.send(JSON.stringify({ 
-                  type: 'audio', 
-                  audio 
-                }));
+              realtimeSession.on('audio', (event: any) => {
+                console.log('Audio response received from OpenAI');
+                console.log('Audio event type:', typeof event);
+                console.log('Audio event keys:', Object.keys(event || {}));
+                
+                // According to docs, event.data should contain PCM16 audio
+                const audioData = event?.data || event;
+                if (audioData) {
+                  console.log('Audio data length:', audioData.length || audioData.byteLength || 'unknown');
+                  
+                  // Convert ArrayBuffer to base64 for transmission
+                  let base64Audio;
+                  if (audioData instanceof ArrayBuffer) {
+                    base64Audio = btoa(String.fromCharCode(...new Uint8Array(audioData)));
+                  } else if (audioData.buffer) {
+                    base64Audio = btoa(String.fromCharCode(...new Uint8Array(audioData.buffer)));
+                  } else {
+                    base64Audio = audioData; // Already base64?
+                  }
+                  
+                  socket.send(JSON.stringify({ 
+                    type: 'audio', 
+                    audio: base64Audio
+                  }));
+                } else {
+                  console.warn('Audio event received but no audio data found');
+                }
               });
 
               realtimeSession.on('error', (error: any) => {
@@ -272,11 +297,15 @@ Starte mit einer freundlichen Begrüßung und frage nach dem Namen des Charakter
 
               // Tool execution events
               realtimeSession.on('tool_executed', (result: any) => {
+                console.log('Tool executed event received:', result?.name || 'unknown');
                 socket.send(JSON.stringify({ 
                   type: 'tool_executed', 
                   result 
                 }));
               });
+              
+              // Log all events that might be available
+              console.log('Available RealtimeSession methods:', Object.getOwnPropertyNames(Object.getPrototypeOf(realtimeSession)));
 
               // Connect to OpenAI using WebSocket transport
               console.log('Connecting to OpenAI Realtime API via WebSocket...');
