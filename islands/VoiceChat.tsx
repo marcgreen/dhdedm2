@@ -301,19 +301,17 @@ export default function VoiceChat(_props: VoiceChatProps) {
           channelCount: 1,
           echoCancellation: true,
           noiseSuppression: true,
-          // Request 24kHz sample rate to match OpenAI requirements
-          sampleRate: 24000
+          // Don't force sample rate - let browser choose optimal rate
         } 
       });
 
-      // Create audio context with 24kHz sample rate (required by OpenAI)
-      audioContextRef.current = new AudioContext({ sampleRate: 24000 });
+      // Create audio context with browser's default sample rate
+      audioContextRef.current = new AudioContext();
       console.log('Audio context sample rate:', audioContextRef.current.sampleRate);
       
       const source = audioContextRef.current.createMediaStreamSource(stream);
       
-      // Use AudioWorklet for better performance instead of deprecated ScriptProcessor
-      // For now, use createScriptProcessor with proper settings
+      // Use createScriptProcessor with proper settings
       const bufferSize = 2048; // Larger buffer for better stability
       const processor = audioContextRef.current.createScriptProcessor(bufferSize, 1, 1);
       
@@ -321,14 +319,19 @@ export default function VoiceChat(_props: VoiceChatProps) {
         if (wsRef.current?.readyState === WebSocket.OPEN) {
           const inputBuffer = event.inputBuffer;
           const inputData = inputBuffer.getChannelData(0);
+          const inputSampleRate = audioContextRef.current!.sampleRate;
           
-          // Convert Float32Array to PCM16 with proper endianness
-          const pcm16Buffer = new ArrayBuffer(inputData.length * 2);
+          // Resample from browser's sample rate to 24kHz for OpenAI
+          const targetSampleRate = 24000;
+          const resampledData = resampleAudioData(inputData, inputSampleRate, targetSampleRate);
+          
+          // Convert resampled Float32Array to PCM16 with proper endianness
+          const pcm16Buffer = new ArrayBuffer(resampledData.length * 2);
           const view = new DataView(pcm16Buffer);
           
-          for (let i = 0; i < inputData.length; i++) {
+          for (let i = 0; i < resampledData.length; i++) {
             // Clamp to [-1, 1] and convert to 16-bit integer
-            const sample = Math.max(-1, Math.min(1, inputData[i]));
+            const sample = Math.max(-1, Math.min(1, resampledData[i]));
             const intSample = sample < 0 ? sample * 0x8000 : sample * 0x7FFF;
             // Write as little-endian 16-bit signed integer
             view.setInt16(i * 2, intSample, true);
@@ -351,11 +354,34 @@ export default function VoiceChat(_props: VoiceChatProps) {
       // Store the processor for cleanup
       mediaRecorderRef.current = processor as any;
       
-      console.log('Started PCM16 audio capture at 24kHz');
+      console.log(`Started PCM16 audio capture at ${audioContextRef.current.sampleRate}Hz, resampling to 24kHz for OpenAI`);
     } catch (error) {
       console.error('Error starting audio capture:', error);
       status.value = "Error accessing microphone";
     }
+  };
+
+  // Simple linear interpolation resampling function
+  const resampleAudioData = (inputData: Float32Array, inputSampleRate: number, outputSampleRate: number): Float32Array => {
+    if (inputSampleRate === outputSampleRate) {
+      return inputData;
+    }
+    
+    const ratio = inputSampleRate / outputSampleRate;
+    const outputLength = Math.round(inputData.length / ratio);
+    const outputData = new Float32Array(outputLength);
+    
+    for (let i = 0; i < outputLength; i++) {
+      const inputIndex = i * ratio;
+      const inputIndexFloor = Math.floor(inputIndex);
+      const inputIndexCeil = Math.min(inputIndexFloor + 1, inputData.length - 1);
+      const fraction = inputIndex - inputIndexFloor;
+      
+      // Linear interpolation
+      outputData[i] = inputData[inputIndexFloor] * (1 - fraction) + inputData[inputIndexCeil] * fraction;
+    }
+    
+    return outputData;
   };
 
   // Process audio queue - plays audio chunks sequentially
@@ -368,8 +394,8 @@ export default function VoiceChat(_props: VoiceChatProps) {
     
     try {
       if (!audioContextRef.current) {
-        // Create audio context with 24kHz sample rate for consistency
-        audioContextRef.current = new AudioContext({ sampleRate: 24000 });
+        // Create audio context with browser's default sample rate for playback
+        audioContextRef.current = new AudioContext();
       }
       
       // Resume audio context if suspended
@@ -379,18 +405,24 @@ export default function VoiceChat(_props: VoiceChatProps) {
       
       // Get the next audio chunk from the queue
       const audioChunk = audioQueueRef.current.shift()!;
-      const openAISampleRate = 24000; // OpenAI uses 24kHz for PCM16
+      const openAISampleRate = 24000; // OpenAI sends 24kHz PCM16
+      const browserSampleRate = audioContextRef.current.sampleRate;
       
-      // Create audio buffer at OpenAI's sample rate
+      // Resample from OpenAI's 24kHz to browser's preferred rate if needed
+      const resampledChunk = browserSampleRate !== openAISampleRate 
+        ? resampleAudioData(audioChunk, openAISampleRate, browserSampleRate)
+        : audioChunk;
+      
+      // Create audio buffer at browser's sample rate
       const audioBuffer = audioContextRef.current.createBuffer(
         1, // mono
-        audioChunk.length,
-        openAISampleRate
+        resampledChunk.length,
+        browserSampleRate
       );
       
       // Copy audio data to buffer
       const channelData = audioBuffer.getChannelData(0);
-      channelData.set(audioChunk);
+      channelData.set(resampledChunk);
       
       // Calculate when this chunk should start playing
       const currentTime = audioContextRef.current.currentTime;
