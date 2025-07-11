@@ -322,8 +322,6 @@ Starte mit einer freundlichen Begrüßung und frage nach dem Namen des Charakter
             }
 
             try {
-              console.log('PCM16 audio chunk received, length:', message.audio.length);
-              
               // Convert base64 back to ArrayBuffer (PCM16 format)
               const binaryString = atob(message.audio);
               const arrayBuffer = new ArrayBuffer(binaryString.length);
@@ -331,6 +329,11 @@ Starte mit einer freundlichen Begrüßung und frage nach dem Namen des Charakter
               
               for (let i = 0; i < binaryString.length; i++) {
                 view[i] = binaryString.charCodeAt(i);
+              }
+              
+              // Log audio chunk details (less frequently to avoid spam)
+              if (Math.random() < 0.01) { // Log ~1% of chunks
+                console.log('PCM16 audio chunk - base64 length:', message.audio.length, 'bytes:', arrayBuffer.byteLength);
               }
               
               // Send PCM16 audio to OpenAI Realtime API

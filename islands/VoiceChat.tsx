@@ -291,14 +291,14 @@ export default function VoiceChat(_props: VoiceChatProps) {
       const stream = await navigator.mediaDevices.getUserMedia({ 
         audio: {
           channelCount: 1,
-          sampleRate: 24000,
           echoCancellation: true,
           noiseSuppression: true,
         } 
       });
 
-      // Create audio context for raw audio processing
-      audioContextRef.current = new AudioContext({ sampleRate: 24000 });
+      // Create audio context using browser's default sample rate
+      audioContextRef.current = new AudioContext();
+      console.log('Audio context sample rate:', audioContextRef.current.sampleRate);
       const source = audioContextRef.current.createMediaStreamSource(stream);
       
       // Create a ScriptProcessorNode to capture raw audio data
