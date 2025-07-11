@@ -184,7 +184,7 @@ export const handler: Handlers = {
     socket.onmessage = async (event) => {
       try {
         const message = JSON.parse(event.data);
-        console.log('Received WebSocket message:', message.type);
+        // console.log('Received WebSocket message:', message.type);
         
         switch (message.type) {
           case 'connect':
