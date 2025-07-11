@@ -415,15 +415,16 @@ export default function VoiceChat(_props: VoiceChatProps) {
       }
       console.log('✅ PCM16 data created, samples:', pcm16Data.length);
       
-      // Use browser's default sample rate for the audio buffer
-      const sampleRate = audioContextRef.current.sampleRate;
-      console.log('🎯 Creating audio buffer with sample rate:', sampleRate);
+      // OpenAI Realtime API sends audio at 24kHz, so use that sample rate
+      const openAISampleRate = 24000;
+      console.log('🎯 Creating audio buffer with OpenAI sample rate:', openAISampleRate);
+      console.log('🎧 Browser AudioContext sample rate:', audioContextRef.current.sampleRate);
       
-      // Create audio buffer for PCM16 data
+      // Create audio buffer for PCM16 data at the correct source sample rate
       const audioBuffer = audioContextRef.current.createBuffer(
         1, // mono
         pcm16Data.length,
-        sampleRate // Use browser's default sample rate
+        openAISampleRate // Use OpenAI's 24kHz sample rate
       );
       
       // Copy PCM16 data to audio buffer, converting to float32
@@ -447,8 +448,8 @@ export default function VoiceChat(_props: VoiceChatProps) {
       source.start();
       console.log('🎵 Audio source started successfully');
       
-      const durationSeconds = pcm16Data.length / sampleRate;
-      console.log(`📊 Audio info: ${pcm16Data.length} samples, ${durationSeconds.toFixed(2)}s duration at ${sampleRate}Hz`);
+      const durationSeconds = pcm16Data.length / openAISampleRate;
+      console.log(`📊 Audio info: ${pcm16Data.length} samples, ${durationSeconds.toFixed(2)}s duration at ${openAISampleRate}Hz`);
       
     } catch (error) {
       console.error('❌ Error in playAudio function:', error);
