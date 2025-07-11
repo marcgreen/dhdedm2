@@ -247,128 +247,58 @@ Starte mit einer freundlichen Begrüßung und frage nach dem Namen des Charakter
               });
               console.log('RealtimeSession created successfully');
 
-              // Set up comprehensive audio response debugging
-              console.log('RealtimeSession created successfully, setting up audio response monitoring');
+                            // Set up audio response listening using the official documented API
+              console.log('RealtimeSession created successfully, setting up audio response listener');
               
-              // Add debug logging for all possible events
-              const realtimeSessionAny = realtimeSession as any;
-              
-              // Try to listen for audio-related events
-              if (typeof realtimeSessionAny.on === 'function') {
-                console.log('RealtimeSession has event emitter capabilities');
+              // Listen for audio responses using the documented API
+              realtimeSession.on('audio', (event: any) => {
+                console.log('🔊 AUDIO EVENT RECEIVED from RealtimeSession!', event);
                 
-                                 // Listen for all events to debug what's available
-                 const originalEmit = realtimeSessionAny.emit;
-                 if (originalEmit) {
-                   realtimeSessionAny.emit = function(eventNameOrObj: any, ...args: any[]) {
-                     // Handle both string event names and object events
-                     const eventName = typeof eventNameOrObj === 'string' ? eventNameOrObj : JSON.stringify(eventNameOrObj);
-                     const eventData = typeof eventNameOrObj === 'string' ? (args.length > 0 ? args[0] : null) : eventNameOrObj;
-                     
-                     console.log(`🎵 RealtimeSession event emitted: ${eventName}`, eventData);
-                     
-                     // Check for audio-related events - look in both event name and event data
-                     let isAudioEvent = false;
-                     
-                     // Safely check event name/string
-                     if (typeof eventName === 'string' && eventName.length > 0) {
-                       const eventStr = eventName.toLowerCase();
-                       isAudioEvent = eventStr.includes('audio') || eventStr.includes('response') || eventStr.includes('delta');
-                     }
-                     
-                     // Also check event data structure
-                     if (!isAudioEvent && eventData && typeof eventData === 'object') {
-                       isAudioEvent = !!(
-                         (eventData.type && typeof eventData.type === 'string' && (
-                           eventData.type.includes('audio') || 
-                           eventData.type.includes('response') ||
-                           eventData.type.includes('delta')
-                         )) ||
-                         eventData.audio ||
-                         eventData.delta
-                       );
-                     }
-                     
-                     if (isAudioEvent) {
-                       console.log(`🔊 AUDIO EVENT DETECTED: ${eventName}`, eventData);
-                       
-                                               // Try to extract audio data from various locations
-                        let audioData: any = null;
-                       if (eventData) {
-                         audioData = eventData.audio || eventData.delta || eventData.data;
-                         
-                         // Also check if the event is a response with audio content
-                         if (eventData.type === 'response.audio.delta' || eventData.type === 'response.audio') {
-                           audioData = eventData.delta || eventData.audio;
-                         }
-                         
-                         // Check nested structures
-                         if (!audioData && eventData.event) {
-                           audioData = eventData.event.audio || eventData.event.delta;
-                         }
-                       }
-                       
-                       if (audioData) {
-                         console.log('🎯 Found audio data, type:', typeof audioData, 'length:', audioData.length || 'no length');
-                         
-                         try {
-                           let base64Audio;
-                           if (typeof audioData === 'string') {
-                             base64Audio = audioData;
-                           } else if (audioData instanceof ArrayBuffer) {
-                             base64Audio = btoa(String.fromCharCode(...new Uint8Array(audioData)));
-                           } else if (audioData instanceof Uint8Array) {
-                             base64Audio = btoa(String.fromCharCode(...audioData));
-                           }
-                           
-                           if (base64Audio) {
-                             console.log('📤 Forwarding audio to client, length:', base64Audio.length);
-                             socket.send(JSON.stringify({ 
-                               type: 'audio', 
-                               audio: base64Audio,
-                               debug: { eventName, dataType: typeof audioData }
-                             }));
-                           }
-                         } catch (error) {
-                           console.error('Error processing audio data:', error);
-                         }
-                       } else {
-                         console.log('🤔 Audio event detected but no audio data found');
-                         console.log('Event data structure:', Object.keys(eventData || {}));
-                       }
-                     }
-                     
-                     return originalEmit.apply(this, arguments);
-                   };
-                 }
+                // According to docs: event.data is a chunk of PCM16 audio
+                const audioData = event.data || event;
                 
-                // Also try direct event listeners for common patterns
-                const audioEvents = ['audio', 'response.audio', 'response.audio.delta', 'conversation.item.created'];
-                audioEvents.forEach(eventName => {
+                if (audioData) {
+                  console.log('🎯 Processing audio data, type:', typeof audioData, 'length:', audioData.length || audioData.byteLength || 'unknown');
+                  
                   try {
-                    realtimeSessionAny.on(eventName, (data: any) => {
-                      console.log(`🎧 Direct listener caught: ${eventName}`, data);
-                    });
-                  } catch (e) {
-                    // Event doesn't exist, that's OK
-                  }
-                });
-              }
-              
-              // Monitor the underlying transport for responses
-              if (realtimeSessionAny.transport || realtimeSessionAny._transport) {
-                const transport = realtimeSessionAny.transport || realtimeSessionAny._transport;
-                console.log('Found transport object:', typeof transport);
-                
-                if (transport && typeof transport.on === 'function') {
-                  transport.on('*', (eventName: string, data: any) => {
-                    console.log(`🚌 Transport event: ${eventName}`, data);
-                    if (eventName.includes('audio')) {
-                      console.log('🔊 Transport audio event detected!', data);
+                    let base64Audio;
+                    
+                    if (audioData instanceof ArrayBuffer) {
+                      console.log('Converting ArrayBuffer to base64, bytes:', audioData.byteLength);
+                      base64Audio = btoa(String.fromCharCode(...new Uint8Array(audioData)));
+                    } else if (audioData instanceof Uint8Array) {
+                      console.log('Converting Uint8Array to base64, bytes:', audioData.length);
+                      base64Audio = btoa(String.fromCharCode(...audioData));
+                    } else if (typeof audioData === 'string') {
+                      console.log('Audio data is already a string, length:', audioData.length);
+                      base64Audio = audioData;
+                    } else {
+                      console.log('Unknown audio data format:', typeof audioData, audioData);
                     }
-                  });
+                    
+                    if (base64Audio) {
+                      console.log('📤 Forwarding PCM16 audio to client, base64 length:', base64Audio.length);
+                      socket.send(JSON.stringify({ 
+                        type: 'audio', 
+                        audio: base64Audio,
+                        debug: { 
+                          originalType: typeof audioData,
+                          originalLength: audioData.length || audioData.byteLength || 'unknown'
+                        }
+                      }));
+                    } else {
+                      console.log('❌ Failed to convert audio data to base64');
+                    }
+                  } catch (error) {
+                    console.error('❌ Error processing audio data:', error);
+                  }
+                } else {
+                  console.log('❌ Audio event received but no data found');
+                  console.log('Event structure:', Object.keys(event || {}));
                 }
-              }
+              });
+              
+              console.log('✅ Audio event listener set up successfully');
 
               // Connect to OpenAI using WebSocket transport
               console.log('Connecting to OpenAI Realtime API via WebSocket...');
