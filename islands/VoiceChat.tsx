@@ -301,8 +301,8 @@ export default function VoiceChat(_props: VoiceChatProps) {
         } 
       });
 
-      // Create audio context with 24kHz sample rate to match Realtime API
-      audioContextRef.current = new AudioContext({ sampleRate: 24000 });
+      // Create audio context using browser's default sample rate
+      audioContextRef.current = new AudioContext();
       console.log('Audio context sample rate:', audioContextRef.current.sampleRate);
       const source = audioContextRef.current.createMediaStreamSource(stream);
       
