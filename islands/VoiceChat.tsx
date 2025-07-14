@@ -23,6 +23,7 @@ export default function VoiceChat(_props: VoiceChatProps) {
   const isPlayingAudioRef = useRef<boolean>(false);
   const nextPlayTimeRef = useRef<number>(0);
   const lastUserSpeechTimeRef = useRef<number>(0);
+  const lastAssistantMessageRef = useRef<ConversationItem | null>(null);
   const uiState = useSignal<UIState>({
     gameState: {
       player: {
@@ -83,6 +84,19 @@ export default function VoiceChat(_props: VoiceChatProps) {
     
     // Debug: Log the raw history to see what we're getting
     console.log('Raw conversation history:', history);
+    console.log('History length:', history.length);
+    
+    // Debug: Log each item to see what's happening to interrupted messages
+    history.forEach((item, index) => {
+      console.log(`History item ${index}:`, {
+        type: item.type,
+        role: item.role,
+        status: item.status,
+        hasContent: !!item.content,
+        contentType: typeof item.content,
+        contentLength: Array.isArray(item.content) ? item.content.length : (item.content ? item.content.length : 0)
+      });
+    });
     
     history.forEach((item: any) => {
       if (item.type === 'message') {
@@ -101,36 +115,33 @@ export default function VoiceChat(_props: VoiceChatProps) {
           });
         }
         
-        // Handle assistant messages (prioritize completed messages, but show in_progress for real-time updates)
+        // Handle assistant messages (show all messages including interrupted ones)
         else if (item.role === 'assistant') {
-          // Only process completed assistant messages to avoid showing partial interrupted content
-          if (item.status === 'completed' || item.status === 'in_progress') {
-            // Try to get content from content array
-            if (item.content && Array.isArray(item.content)) {
-              item.content.forEach((part: any) => {
-                if (part.type === 'audio' && part.transcript) {
-                  content += part.transcript;
-                } else if (part.type === 'text' && part.text) {
-                  content += part.text;
-                }
-              });
-            }
-            
-            // Also try to get content from output array (alternative structure)
-            if (!content && item.output && Array.isArray(item.output)) {
-              item.output.forEach((part: any) => {
-                if (part.type === 'audio' && part.transcript) {
-                  content += part.transcript;
-                } else if (part.type === 'text' && part.text) {
-                  content += part.text;
-                }
-              });
-            }
-            
-            // Try direct content string
-            if (!content && typeof item.content === 'string') {
-              content = item.content;
-            }
+          // Try to get content from content array
+          if (item.content && Array.isArray(item.content)) {
+            item.content.forEach((part: any) => {
+              if (part.type === 'audio' && part.transcript) {
+                content += part.transcript;
+              } else if (part.type === 'text' && part.text) {
+                content += part.text;
+              }
+            });
+          }
+          
+          // Also try to get content from output array (alternative structure)
+          if (!content && item.output && Array.isArray(item.output)) {
+            item.output.forEach((part: any) => {
+              if (part.type === 'audio' && part.transcript) {
+                content += part.transcript;
+              } else if (part.type === 'text' && part.text) {
+                content += part.text;
+              }
+            });
+          }
+          
+          // Try direct content string
+          if (!content && typeof item.content === 'string') {
+            content = item.content;
           }
         }
         
@@ -140,15 +151,70 @@ export default function VoiceChat(_props: VoiceChatProps) {
         }
         
         if (content.trim()) {
+          // Add status indicator for interrupted messages
+          let displayContent = content.trim();
+          if (item.role === 'assistant' && item.status && item.status !== 'completed') {
+            // Add visual indicator for interrupted/incomplete messages
+            displayContent += ` ${item.status === 'interrupted' ? '⚠️ (unterbrochen)' : '⏸️ (unvollständig)'}`;
+          }
+          
           formattedHistory.push({
             timestamp: new Date().toLocaleTimeString(),
             role: item.role === 'user' ? 'user' : 'assistant',
-            content: content.trim(),
+            content: displayContent,
             type: 'message'
           });
         }
       }
     });
+    
+    // Debug: Log the final formatted history
+    console.log('Formatted history items:', formattedHistory.length);
+    formattedHistory.forEach((item, index) => {
+      console.log(`Formatted item ${index}:`, {
+        role: item.role,
+        contentPreview: item.content.substring(0, 50) + '...',
+        timestamp: item.timestamp
+      });
+    });
+    
+    // Check if we lost the last assistant message due to interruption
+    const lastAssistantInNew = formattedHistory.filter(item => item.role === 'assistant').pop();
+    const hadLastAssistant = lastAssistantMessageRef.current !== null;
+    
+    // If we had a last assistant message but it's missing from new history, preserve it
+    if (hadLastAssistant && lastAssistantMessageRef.current && 
+        (!lastAssistantInNew || lastAssistantInNew.content !== lastAssistantMessageRef.current.content)) {
+      
+      console.log('Preserving interrupted assistant message:', lastAssistantMessageRef.current.content.substring(0, 50) + '...');
+      
+      // Find the right place to insert the preserved message
+      const preservedMessage = {
+        ...lastAssistantMessageRef.current,
+        content: lastAssistantMessageRef.current.content + ' ⚠️ (unterbrochen)'
+      };
+      
+      // Insert before the last user message (the interruption)
+      let lastUserIndex = -1;
+      for (let i = formattedHistory.length - 1; i >= 0; i--) {
+        if (formattedHistory[i].role === 'user') {
+          lastUserIndex = i;
+          break;
+        }
+      }
+      
+      if (lastUserIndex > 0) {
+        formattedHistory.splice(lastUserIndex, 0, preservedMessage);
+      } else {
+        formattedHistory.push(preservedMessage);
+      }
+    }
+    
+    // Update the last assistant message reference
+    const currentLastAssistant = formattedHistory.filter(item => item.role === 'assistant').pop();
+    if (currentLastAssistant) {
+      lastAssistantMessageRef.current = currentLastAssistant;
+    }
     
     // Update only conversation history, game state updates come from direct messages
     uiState.value = { 
