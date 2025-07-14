@@ -13,6 +13,7 @@ interface UIState {
 export default function VoiceChat(_props: VoiceChatProps) {
   const isConnected = useSignal(false);
   const isConnecting = useSignal(false);
+  const isOnline = useSignal(navigator?.onLine ?? true);
   const status = useSignal("Ready to start");
   const wsRef = useRef<WebSocket | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -69,15 +70,39 @@ export default function VoiceChat(_props: VoiceChatProps) {
   useEffect(() => {
     if (!IS_BROWSER) return;
     
+    // Set up online/offline listeners
+    const handleOnline = () => {
+      isOnline.value = true;
+      console.log('[PWA] Network connection restored');
+    };
+    
+    const handleOffline = () => {
+      isOnline.value = false;
+      console.log('[PWA] Network connection lost');
+      // Stop voice chat if currently connected
+      if (isConnected.value) {
+        stopVoiceChat();
+      }
+    };
+    
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    
     // Request microphone permission on load
     navigator.mediaDevices.getUserMedia({ audio: true })
       .then(() => {
-        status.value = "Microphone ready - Click to start";
+        status.value = isOnline.value ? "Microphone ready - Click to start" : "Offline - Voice chat unavailable";
       })
       .catch((err) => {
         console.error("Microphone permission denied:", err);
         status.value = "Microphone permission required";
       });
+      
+    // Cleanup listeners
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
   }, []);
 
   // Game state updates now come directly from the backend via WebSocket messages
@@ -716,7 +741,12 @@ export default function VoiceChat(_props: VoiceChatProps) {
   };
 
   const startVoiceChat = async () => {
-    if (!IS_BROWSER || isConnecting.value) return;
+    if (!IS_BROWSER || isConnecting.value || !isOnline.value) {
+      if (!isOnline.value) {
+        status.value = "Offline - Voice chat requires internet connection";
+      }
+      return;
+    }
     
     try {
       isConnecting.value = true;
@@ -800,15 +830,17 @@ export default function VoiceChat(_props: VoiceChatProps) {
           <button
             onClick={toggleVoiceChat}
             class={`w-24 h-24 rounded-full text-white text-3xl font-bold transition-all duration-200 ${
-              isConnected.value 
+              !isOnline.value
+                ? 'bg-gray-500 cursor-not-allowed shadow-lg shadow-gray-500/50'
+                : isConnected.value 
                 ? 'bg-red-500 hover:bg-red-600 animate-pulse shadow-lg shadow-red-500/50' 
                 : isConnecting.value
                 ? 'bg-yellow-500 animate-spin shadow-lg shadow-yellow-500/50'
                 : 'bg-green-500 hover:bg-green-600 hover:scale-105 shadow-lg shadow-green-500/50'
             }`}
-            disabled={!IS_BROWSER || isConnecting.value}
+            disabled={!IS_BROWSER || isConnecting.value || !isOnline.value}
           >
-            {isConnecting.value ? '⏳' : isConnected.value ? '🔴' : '🎙️'}
+            {!isOnline.value ? '📡' : isConnecting.value ? '⏳' : isConnected.value ? '🔴' : '🎙️'}
           </button>
         </div>
         
