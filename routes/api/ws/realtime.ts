@@ -653,12 +653,14 @@ ${daggerheartRules}
 - Nutze 'track_language' für Sprachlernfortschritt
 
 **WÜRFELREGELN:**
-- Handlungswürfe: 2d12 (Hoffnung vs. Furcht) + Modifikatoren
+- **SPIELER-WÜRFE: 2d12** (Hoffnung vs. Furcht) + Modifikatoren
+- **GM-WÜRFE: d20** + Modifikator für Gegnerwürfe
 - Schwierigkeitsgrade: 5 (Leicht) bis 30 (Schwer)
 - Erfahrungen: +2 Bonus (nicht +1d6!)
 - Vorteil/Nachteil: +/-1d6 zum Gesamtergebnis
-- Kritischer Erfolg: Hoffnung = Furcht
+- Kritischer Erfolg: Hoffnung = Furcht (nur bei Spieler-2d12)
 - Reaktionswürfe: Keine Hoffnung/Furcht-Generierung
+- **WICHTIG**: Spieler verwenden IMMER 2d12, GM verwendet d20 für Angriffe!
 
 Starte mit einer freundlichen Begrüßung und frage nach dem Namen des Charakters. Nutze dann die Tools für die Charaktererstellung!`,
                 tools: tools,
