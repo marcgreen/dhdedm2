@@ -292,8 +292,9 @@ Deno.test("dealDamageToPlayer with thresholds", () => {
 Deno.test("dealDamageToPlayer with armor", () => {
   const gameManager = createTestManager();
   
-  // Set up armor
-  gameManager.updatePlayer({ armor: 2 });
+  // Set up armor (default is 3)
+  const initialState = gameManager.getState();
+  assertEquals(initialState.player.armor.current, 3);
   
   // Attack that would hit major threshold - armor should reduce
   const result = gameManager.dealDamageToPlayer({ damage: 7 }); // Above major (5)
@@ -301,9 +302,54 @@ Deno.test("dealDamageToPlayer with armor", () => {
   assertEquals(result.armorUsed, true);
   assert(result.damageAfterReduction < 7); // Damage should be reduced
   
-  // Verify armor was consumed
+  // Verify exactly 1 armor was consumed
   const state = gameManager.getState();
-  assertEquals(state.player.armor.current, 1);
+  assertEquals(state.player.armor.current, 2); // Should be 3-1=2
+});
+
+Deno.test("armor limitation: only 1 slot per damage instance", () => {
+  const gameManager = createTestManager();
+  
+  // Set up armor and verify initial state
+  const initialState = gameManager.getState();
+  assertEquals(initialState.player.armor.current, 3);
+  
+  // First attack: massive damage (20) - should only use 1 armor slot
+  const result1 = gameManager.dealDamageToPlayer({ damage: 20 }); // Massive damage
+  assertEquals(result1.armorUsed, true);
+  assertEquals(result1.thresholdReached, 'severe'); // Reduced from massive to severe
+  assertEquals(result1.hpLost, 3); // Severe = 3 HP
+  
+  // Verify exactly 1 armor slot used, not multiple
+  const state1 = gameManager.getState();
+  assertEquals(state1.player.armor.current, 2); // Only 1 slot consumed
+  
+  // Second attack: another massive damage - should use another 1 armor slot
+  const result2 = gameManager.dealDamageToPlayer({ damage: 20 });
+  assertEquals(result2.armorUsed, true);
+  assertEquals(result2.thresholdReached, 'severe'); // Again reduced from massive to severe
+  
+  // Verify another 1 armor slot used
+  const state2 = gameManager.getState();
+  assertEquals(state2.player.armor.current, 1); // Now down to 1
+  
+  // Third attack: major damage when only 1 armor left
+  const result3 = gameManager.dealDamageToPlayer({ damage: 6 });
+  assertEquals(result3.armorUsed, true);
+  assertEquals(result3.thresholdReached, 'minor'); // Reduced from major to minor
+  
+  // Verify last armor slot consumed
+  const state3 = gameManager.getState();
+  assertEquals(state3.player.armor.current, 0); // All armor used up
+  
+  // Fourth attack: no armor left
+  const result4 = gameManager.dealDamageToPlayer({ damage: 10 });
+  assertEquals(result4.armorUsed, false); // No armor available
+  assertEquals(result4.thresholdReached, 'severe'); // Full damage
+  
+  // Verify armor stays at 0
+  const state4 = gameManager.getState();
+  assertEquals(state4.player.armor.current, 0);
 });
 
 Deno.test("dealDamageToPlayer immunity", () => {

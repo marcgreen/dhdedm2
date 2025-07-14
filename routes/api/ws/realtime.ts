@@ -215,7 +215,7 @@ const createDaggerheartTools = (sessionId: string) => {
   // Phase 2 Tool: Deal damage to player
   const dealDamageToPlayerTool = tool({
     name: 'deal_damage_to_player',
-    description: 'Schaden an Spieler mit Schwellenwert-System',
+    description: 'Schaden an Spieler mit Schwellenwert-System (max. 1 Rüstungs-Slot pro Schaden)',
     parameters: {
       type: 'object',
       properties: {
@@ -487,6 +487,13 @@ Damage types (Physical/Magical) matter for:
 - **Resistance**: Halve damage before comparing to thresholds
 - **Immunity**: Ignore damage entirely
 - **Direct Damage**: Can't be reduced by marking Armor
+
+**Armor Usage**: Players can mark exactly 1 Armor slot per incoming damage to reduce it by one threshold level (unless a special ability states otherwise). This means:
+- If damage would be Major (2 HP), armor reduces it to Minor (1 HP)
+- If damage would be Severe (3 HP), armor reduces it to Major (2 HP)
+- If damage would be Massive (4 HP), armor reduces it to Severe (3 HP)
+- Only 1 armor slot can be used per attack/damage instance
+- Player chooses whether to use armor after seeing the damage amount
 
 ### The Spotlight
 The spotlight represents narrative focus:

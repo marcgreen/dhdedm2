@@ -150,6 +150,13 @@ Damage types (Physical/Magical) matter for:
 - **Immunity**: Ignore damage entirely
 - **Direct Damage**: Can't be reduced by marking Armor
 
+**Armor Usage**: Players can mark exactly 1 Armor slot per incoming damage to reduce it by one threshold level (unless a special ability states otherwise). This means:
+- If damage would be Major (2 HP), armor reduces it to Minor (1 HP)
+- If damage would be Severe (3 HP), armor reduces it to Major (2 HP)
+- If damage would be Massive (4 HP), armor reduces it to Severe (3 HP)
+- Only 1 armor slot can be used per attack/damage instance
+- Player chooses whether to use armor after seeing the damage amount
+
 ### The Spotlight
 The spotlight represents narrative focus:
 - **Player keeps spotlight**: When they succeed with Hope
@@ -543,17 +550,17 @@ dealDamageToPlayer(params)
 // params: {
 //   damage: number,
 //   damageType?: 'physical'|'magical',
-//   canUseArmor?: boolean,
-//   resistance?: boolean,     // Halve damage
-//   immunity?: boolean,       // Ignore damage
-//   direct?: boolean         // Can't be reduced by armor
+//   canUseArmor?: boolean,        // Player can use max 1 armor slot per damage
+//   resistance?: boolean,         // Halve damage
+//   immunity?: boolean,           // Ignore damage
+//   direct?: boolean             // Can't be reduced by armor
 // }
 // Returns: {
 //   hpLost: number,
-//   armorUsed: boolean,
+//   armorUsed: boolean,          // True if 1 armor slot was consumed
 //   damageAfterReduction: number,
 //   newVulnerable: boolean,
-//   deathCheck: boolean      // If HP hit 0
+//   deathCheck: boolean          // If HP hit 0
 // }
 
 /**
@@ -720,4 +727,3 @@ environmentalHazard(params)
 //   effect: string,
 //   succeeded?: boolean      // For fate rolls
 // }
-```
