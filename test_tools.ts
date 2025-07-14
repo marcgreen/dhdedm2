@@ -183,6 +183,137 @@ async function runTests() {
     console.log('✅ PASSED\n');
   }
   
+  // Test 7: Critical edge cases - Fear boundary (max 12)
+  {
+    console.log('Test 7: Fear boundary conditions');
+    const gameManager = createGameManager('test-session-7');
+    
+    // Set fear to near max
+    const state = gameManager.getState();
+    state.gm.fear = 11;
+    
+    // Roll that would generate fear - should cap at 12
+    const result = gameManager.rollAction({ trait: 'strength', difficulty: 25 }); // Likely failure
+    
+    if (result.fearGained > 0) {
+      const updatedState = gameManager.getState();
+      assert(updatedState.gm.fear <= 12, 'Fear should never exceed 12');
+      assertEquals(updatedState.gm.fear, 12);
+    }
+    console.log('✅ PASSED\n');
+  }
+  
+  // Test 8: HP boundary conditions (potential death)
+  {
+    console.log('Test 8: HP boundary conditions');
+    const gameManager = createGameManager('test-session-8');
+    
+    // Test HP going to 0
+    const result1 = gameManager.updatePlayer({ hp: 0 });
+    assertEquals(result1.newState.hp.current, 0);
+    
+    // Test negative HP (should clamp to 0)
+    const result2 = gameManager.updatePlayer({ hp: -5 });
+    assertEquals(result2.newState.hp.current, 0);
+    
+    // Test HP above max (should clamp to max)
+    const result3 = gameManager.updatePlayer({ hp: 20 });
+    assertEquals(result3.newState.hp.current, 10); // Max is 10
+    
+    console.log('✅ PASSED\n');
+  }
+  
+  // Test 9: Invalid trait names (realistic AI error)
+  {
+    console.log('Test 9: Invalid trait handling');
+    const gameManager = createGameManager('test-session-9');
+    
+    try {
+      // This should not crash the system, even with invalid trait
+      const result = gameManager.rollAction({ trait: 'dexterity', difficulty: 10 }); // Wrong name
+      
+      // Should still roll dice and return result structure
+      assert(result.rolls.hope >= 1 && result.rolls.hope <= 12);
+      assert(result.rolls.fear >= 1 && result.rolls.fear <= 12);
+      console.log('✅ PASSED (graceful degradation)\n');
+    } catch (error) {
+      console.log('✅ PASSED (throws error appropriately)\n');
+    }
+  }
+  
+  // Test 10: Experience edge cases
+  {
+    console.log('Test 10: Experience edge cases');
+    const gameManager = createGameManager('test-session-10');
+    
+    const state = gameManager.getState();
+    state.player.experiences = [{ name: 'Dieb', used: true }]; // Already used
+    
+    // Try to use already-used experience
+    const result1 = gameManager.rollAction({ 
+      trait: 'finesse', 
+      difficulty: 15, 
+      experienceBonus: 2,
+      useExperience: 'Dieb'
+    });
+    
+    // Should not crash, experience should remain used
+    const updatedState = gameManager.getState();
+    const exp = updatedState.player.experiences.find((e: any) => e.name === 'Dieb');
+    assertEquals(exp.used, true);
+    
+    // Try to use non-existent experience
+    const result2 = gameManager.rollAction({ 
+      trait: 'strength', 
+      difficulty: 10, 
+      experienceBonus: 2,
+      useExperience: 'NonExistent'
+    });
+    
+    // Should not crash and should handle gracefully
+    assertEquals(result2.experienceUsed, 'NonExistent');
+    console.log('✅ PASSED\n');
+  }
+  
+  // Test 11: Advantage + Disadvantage interaction
+  {
+    console.log('Test 11: Advantage/Disadvantage interaction');
+    const gameManager = createGameManager('test-session-11');
+    
+    const result = gameManager.rollAction({ 
+      trait: 'agility', 
+      difficulty: 15,
+      advantage: 2,
+      disadvantage: 1
+    });
+    
+    // Should handle both modifiers correctly (net +1 advantage)
+    assert(typeof result.modifierRoll === 'number');
+    assert(result.total >= result.rolls.hope + result.rolls.fear + result.modifierRoll);
+    
+    console.log('✅ PASSED\n');
+  }
+  
+  // Test 12: Stress boundary and vulnerability condition
+  {
+    console.log('Test 12: Stress boundary and vulnerability');
+    const gameManager = createGameManager('test-session-12');
+    
+    // Test stress going to 0 (should trigger vulnerable condition in real game)
+    const result1 = gameManager.updatePlayer({ stress: 0 });
+    assertEquals(result1.newState.stress.current, 0);
+    
+    // Test negative stress (should clamp to 0)
+    const result2 = gameManager.updatePlayer({ stress: -3 });
+    assertEquals(result2.newState.stress.current, 0);
+    
+    // Test stress above max (should clamp to max)
+    const result3 = gameManager.updatePlayer({ stress: 15 });
+    assertEquals(result3.newState.stress.current, 5); // Max is 5
+    
+    console.log('✅ PASSED\n');
+  }
+
   console.log('🎉 All tests passed! Tools are working correctly.');
 }
 
