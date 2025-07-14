@@ -22,6 +22,7 @@ export default function VoiceChat(_props: VoiceChatProps) {
   const audioQueueRef = useRef<Float32Array[]>([]);
   const isPlayingAudioRef = useRef<boolean>(false);
   const nextPlayTimeRef = useRef<number>(0);
+  const lastUserSpeechTimeRef = useRef<number>(0);
   const uiState = useSignal<UIState>({
     gameState: {
       player: {
@@ -100,33 +101,36 @@ export default function VoiceChat(_props: VoiceChatProps) {
           });
         }
         
-        // Handle assistant messages (can be in_progress or completed)
+        // Handle assistant messages (prioritize completed messages, but show in_progress for real-time updates)
         else if (item.role === 'assistant') {
-          // Try to get content from content array
-          if (item.content && Array.isArray(item.content)) {
-            item.content.forEach((part: any) => {
-              if (part.type === 'audio' && part.transcript) {
-                content += part.transcript;
-              } else if (part.type === 'text' && part.text) {
-                content += part.text;
-              }
-            });
-          }
-          
-          // Also try to get content from output array (alternative structure)
-          if (!content && item.output && Array.isArray(item.output)) {
-            item.output.forEach((part: any) => {
-              if (part.type === 'audio' && part.transcript) {
-                content += part.transcript;
-              } else if (part.type === 'text' && part.text) {
-                content += part.text;
-              }
-            });
-          }
-          
-          // Try direct content string
-          if (!content && typeof item.content === 'string') {
-            content = item.content;
+          // Only process completed assistant messages to avoid showing partial interrupted content
+          if (item.status === 'completed' || item.status === 'in_progress') {
+            // Try to get content from content array
+            if (item.content && Array.isArray(item.content)) {
+              item.content.forEach((part: any) => {
+                if (part.type === 'audio' && part.transcript) {
+                  content += part.transcript;
+                } else if (part.type === 'text' && part.text) {
+                  content += part.text;
+                }
+              });
+            }
+            
+            // Also try to get content from output array (alternative structure)
+            if (!content && item.output && Array.isArray(item.output)) {
+              item.output.forEach((part: any) => {
+                if (part.type === 'audio' && part.transcript) {
+                  content += part.transcript;
+                } else if (part.type === 'text' && part.text) {
+                  content += part.text;
+                }
+              });
+            }
+            
+            // Try direct content string
+            if (!content && typeof item.content === 'string') {
+              content = item.content;
+            }
           }
         }
         
@@ -210,7 +214,12 @@ export default function VoiceChat(_props: VoiceChatProps) {
           }
           break;
           
-        
+        case 'interruption':
+        case 'user_speaking':
+          // User interrupted the AI - clear audio queue to stop AI speech
+          clearAudioQueue();
+          console.log('User interruption detected - clearing audio queue');
+          break;
           
         case 'error':
           const errorMsg = typeof message.error === 'string' ? message.error : JSON.stringify(message.error);
@@ -278,6 +287,21 @@ export default function VoiceChat(_props: VoiceChatProps) {
           const inputBuffer = event.inputBuffer;
           const inputData = inputBuffer.getChannelData(0);
           const inputSampleRate = audioContextRef.current!.sampleRate;
+          
+          // Detect user speech activity (simple volume threshold)
+          const volumeThreshold = 0.01; // Adjust as needed
+          const averageVolume = inputData.reduce((sum, sample) => sum + Math.abs(sample), 0) / inputData.length;
+          
+          // If user is speaking and AI is playing audio, clear the queue (proactive interruption)
+          if (averageVolume > volumeThreshold && isPlayingAudioRef.current) {
+            const now = Date.now();
+            // Debounce to avoid clearing on brief noise
+            if (now - lastUserSpeechTimeRef.current > 500) {
+              clearAudioQueue();
+              console.log('Proactive interruption: User started speaking while AI was talking');
+            }
+            lastUserSpeechTimeRef.current = now;
+          }
           
           // Resample from browser's sample rate to 24kHz for OpenAI
           const targetSampleRate = 24000;
@@ -420,12 +444,21 @@ export default function VoiceChat(_props: VoiceChatProps) {
     }
   };
 
-  // Stop audio capture and clear audio queue
-  const stopAudioCapture = () => {
+  // Clear audio queue and reset playback state (for interruptions)
+  const clearAudioQueue = () => {
     // Clear audio queue and stop playback
     audioQueueRef.current = [];
     isPlayingAudioRef.current = false;
     nextPlayTimeRef.current = 0;
+    lastUserSpeechTimeRef.current = 0;
+    
+    console.log('Audio queue cleared due to interruption');
+  };
+
+  // Stop audio capture and clear audio queue
+  const stopAudioCapture = () => {
+    // Clear audio queue and stop playback
+    clearAudioQueue();
     
     // Disconnect the audio processor
     if (mediaRecorderRef.current) {
