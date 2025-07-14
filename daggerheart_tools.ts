@@ -8,6 +8,7 @@ const gameStates = new Map<string, any>();
 export const createDefaultGameState = () => ({
   player: {
     name: '',
+    level: 1,
     hp: { current: 10, max: 10 },
     stress: { current: 5, max: 5 },
     hope: 0,
@@ -16,15 +17,26 @@ export const createDefaultGameState = () => ({
     thresholds: { major: 5, severe: 10 },
     proficiency: 1,
     conditions: [],
-    experiences: []
+    experiences: [],
+    class: '',
+    background: '',
+    currentLocation: 'Starting Area',
+    gold: '',
+    inventory: []
   },
   gm: {
     fear: 0,
     hasSpotlight: false
   },
   scene: {
+    currentScene: 'Character Creation',
+    sceneDescription: 'Du stehst am Beginn eines neuen Abenteuers...',
+    activeQuests: [],
     countdowns: []
-  }
+  },
+  sessionId: '',
+  languageCorrections: 0,
+  vocabularyIntroduced: []
 });
 
 // Helper functions for dice rolling
@@ -44,7 +56,9 @@ export class DaggerheartGameManager {
 
   getGameState() {
     if (!gameStates.has(this.sessionId)) {
-      gameStates.set(this.sessionId, createDefaultGameState());
+      const defaultState = createDefaultGameState();
+      defaultState.sessionId = this.sessionId;
+      gameStates.set(this.sessionId, defaultState);
     }
     return gameStates.get(this.sessionId);
   }
@@ -140,6 +154,26 @@ export class DaggerheartGameManager {
       changes.push(`name set: ${args.name}`);
     }
     
+    if (args.level !== undefined) {
+      state.player.level = args.level;
+      changes.push(`level: ${args.level}`);
+    }
+    
+    if (args.location) {
+      state.player.currentLocation = args.location;
+      changes.push(`location: ${args.location}`);
+    }
+    
+    if (args.class) {
+      state.player.class = args.class;
+      changes.push(`class: ${args.class}`);
+    }
+    
+    if (args.background) {
+      state.player.background = args.background;
+      changes.push(`background: ${args.background}`);
+    }
+    
     if (args.evasion !== undefined) {
       state.player.evasion = args.evasion;
       changes.push(`evasion: ${args.evasion}`);
@@ -187,7 +221,15 @@ export class DaggerheartGameManager {
         hope: state.player.hope,
         armor: state.player.armor,
         conditions: state.player.conditions,
-        experiences: state.player.experiences
+        experiences: state.player.experiences,
+        name: state.player.name,
+        level: state.player.level,
+        currentLocation: state.player.currentLocation,
+        class: state.player.class,
+        background: state.player.background,
+        evasion: state.player.evasion,
+        proficiency: state.player.proficiency,
+        thresholds: state.player.thresholds
       }
     };
   }
