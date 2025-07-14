@@ -29,7 +29,7 @@ const createDaggerheartTools = (sessionId: string) => {
   // Phase 1 Tool: Update player state
   const updatePlayerTool = tool({
     name: 'update_player',
-    description: 'Spieler-Zustand aktualisieren',
+    description: 'Spieler-Zustand aktualisieren (inkl. Charakter-Info)',
     parameters: {
       type: 'object',
       properties: {
@@ -49,7 +49,11 @@ const createDaggerheartTools = (sessionId: string) => {
         maxStress: { type: 'number' },
         maxArmor: { type: 'number' },
         majorThreshold: { type: 'number' },
-        severeThreshold: { type: 'number' }
+        severeThreshold: { type: 'number' },
+        level: { type: 'number' },
+        location: { type: 'string' },
+        class: { type: 'string' },
+        background: { type: 'string' }
       },
       required: [],
       additionalProperties: false,
@@ -185,6 +189,36 @@ const createDaggerheartTools = (sessionId: string) => {
     },
   });
 
+  const updateInventoryTool = tool({
+    name: 'update_inventory',
+    description: 'Update character inventory (add/remove items)',
+    strict: false,
+    parameters: {
+      type: 'object',
+      properties: {
+        action: { type: 'string', enum: ['add', 'remove'] },
+        item: { type: 'string' },
+        quantity: { type: 'number', default: 1 },
+        gold: { type: 'string' },
+      },
+      required: [],
+      additionalProperties: true,
+    },
+    async execute(args: any) {
+      if (args.gold) {
+        return `Gold updated: ${args.gold}`;
+      }
+      if (args.item) {
+        const action = args.action || 'add';
+        const quantity = args.quantity || 1;
+        return `${action === 'add' ? 'Added' : 'Removed'} ${quantity}x ${args.item}`;
+      }
+      return `Inventory updated`;
+    },
+  });
+
+
+
 
 
   // Phase 2 Tool: Roll damage with weapon dice
@@ -300,6 +334,7 @@ const createDaggerheartTools = (sessionId: string) => {
     rollDiceTool,
     manageQuestsTool,
     trackLanguageTool,
+    updateInventoryTool,
   ];
 };
 
@@ -801,8 +836,8 @@ ${daggerheartRules}
 - Halte sanft fest - keine vorbestimmten Ergebnisse
 
 **TOOL-VERWENDUNG:**
-- Nutze 'update_character' für Name, Level, HP, Attribute, Ort
-- Nutze 'update_inventory' für Gegenstände (add/remove)
+- Nutze 'update_player' für Name, Level, HP, Attribute, Ort, Klasse, Hintergrund
+- Nutze 'update_inventory' für Gegenstände (add/remove) und Gold
 - Nutze 'update_scene' für Schauplätze und Beschreibungen
 - Nutze 'roll_dice' für alle Würfelwürfe (verwende Daggerheart-Regeln!)
 - Nutze 'manage_quests' für Aufgaben (add/complete/update)
@@ -875,7 +910,7 @@ Starte mit einer freundlichen Begrüßung und frage nach dem Namen des Charakter
 
               // Listen for conversation history updates (documented API)
               realtimeSession.on('history_updated', (history: any) => {
-                console.log('Conversation history updated, sending to client');
+                // console.log('Conversation history updated, sending to client');
                 
                 // Debug: Log the structure to see if tool calls are included
                 if (history && Array.isArray(history)) {
@@ -883,13 +918,13 @@ Starte mit einer freundlichen Begrüßung und frage nach dem Namen des Charakter
                     item.type === 'function_call' || item.type === 'tool_call'
                   );
                   if (toolCalls.length > 0) {
-                    console.log('Found tool calls in history:', toolCalls.map((tc: any) => ({
-                      type: tc.type,
-                      name: tc.name,
-                      status: tc.status,
-                      arguments: tc.arguments,
-                      output: tc.output
-                    })));
+                    // console.log('Found tool calls in history:', toolCalls.map((tc: any) => ({
+                    //   type: tc.type,
+                    //   name: tc.name,
+                    //   status: tc.status,
+                    //   arguments: tc.arguments,
+                    //   output: tc.output
+                    // })));
                   }
                 }
                 

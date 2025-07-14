@@ -182,9 +182,9 @@ export default function VoiceChat(_props: VoiceChatProps) {
     
     history.forEach((item: any) => {
       // Debug: Log each item to see its structure
-      if (item.type === 'function_call' || item.type === 'tool_call') {
-        console.log('Found tool call in history:', item);
-      }
+      // if (item.type === 'function_call' || item.type === 'tool_call') {
+      //   console.log('Found tool call in history:', item);
+      // }
       
       if (item.type === 'message') {
         let content = '';
