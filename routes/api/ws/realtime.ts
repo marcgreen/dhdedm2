@@ -2,9 +2,24 @@ import { Handlers } from "$fresh/server.ts";
 import { RealtimeAgent, RealtimeSession } from "@openai/agents-realtime";
 import { tool } from "@openai/agents-realtime";
 import { createGameManager } from "../../../daggerheart_tools.ts";
+import { GameState, ToolResult } from "../../../types.ts";
 
 // Store active sessions
 const sessions = new Map<string, RealtimeSession>();
+const sockets = new Map<string, WebSocket>();
+
+// Helper function to send game state updates
+const sendGameStateUpdate = (sessionId: string, toolResult: ToolResult) => {
+  const socket = sockets.get(sessionId);
+  if (socket && socket.readyState === WebSocket.OPEN) {
+    socket.send(JSON.stringify({
+      type: 'game_state_updated',
+      sessionId,
+      gameState: toolResult.gameState,
+      toolResult
+    }));
+  }
+};
 
 // Daggerheart tools with session context
 const createDaggerheartTools = (sessionId: string) => {
@@ -60,6 +75,16 @@ const createDaggerheartTools = (sessionId: string) => {
     },
     async execute(args: any) {
       const result = gameManager.updatePlayer(args);
+      
+      // Send game state update to frontend
+      const gameState = gameManager.getState();
+      const toolResult: ToolResult = {
+        name: 'update_player',
+        parameters: args,
+        output: result,
+        gameState: gameState
+      };
+      sendGameStateUpdate(sessionId, toolResult);
       
       console.log('updatePlayer called with:', args);
       console.log('updatePlayer changes:', result.changes);
@@ -347,6 +372,7 @@ export const handler: Handlers = {
     socket.onopen = () => {
       console.log("WebSocket connection opened");
       sessionId = crypto.randomUUID();
+      sockets.set(sessionId, socket);
     };
 
     socket.onmessage = async (event) => {
@@ -1061,6 +1087,7 @@ Starte mit einer freundlichen Begrüßung und frage nach dem Namen des Charakter
       // Clean up session if still active
       if (realtimeSession && sessionId) {
         sessions.delete(sessionId);
+        sockets.delete(sessionId);
       }
     };
 

@@ -1,50 +1,13 @@
 import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 import { IS_BROWSER } from "$fresh/runtime.ts";
+import { GameState, ConversationItem, ToolResult } from "../types.ts";
 
 interface VoiceChatProps {}
 
-interface CharacterState {
-  name: string;
-  level: number;
-  hp: number;
-  maxHp: number;
-  stress: number;
-  maxStress: number;
-  hope: number;
-  armor: number;
-  maxArmor: number;
-  evasion: number;
-  proficiency: number;
-  majorThreshold: number;
-  severeThreshold: number;
-  conditions: string[];
-  experiences: string[];
-  class: string;
-  background: string;
-  currentLocation: string;
-  gold: string;
-  inventory: string[];
-}
-
-interface GameState {
-  character: CharacterState;
-  currentScene: string;
-  sceneDescription: string;
-  activeQuests: string[];
+interface UIState {
+  gameState: GameState;
   conversationHistory: ConversationItem[];
-  sessionId: string;
-  languageCorrections: number;
-  vocabularyIntroduced: string[];
-}
-
-
-
-interface ConversationItem {
-  timestamp: string;
-  role: 'user' | 'assistant';
-  content: string;
-  type: 'message' | 'audio';
 }
 
 export default function VoiceChat(_props: VoiceChatProps) {
@@ -59,36 +22,41 @@ export default function VoiceChat(_props: VoiceChatProps) {
   const audioQueueRef = useRef<Float32Array[]>([]);
   const isPlayingAudioRef = useRef<boolean>(false);
   const nextPlayTimeRef = useRef<number>(0);
-  const gameState = useSignal<GameState>({
-    character: {
-      name: "",
-      level: 1,
-      hp: 10,
-      maxHp: 10,
-      stress: 0,
-      maxStress: 10,
-      hope: 2,
-      armor: 0,
-      maxArmor: 0,
-      evasion: 10,
-      proficiency: 1,
-      majorThreshold: 5,
-      severeThreshold: 10,
-      conditions: [],
-      experiences: [],
-      class: "",
-      background: "",
-      currentLocation: "Starting Area",
-      gold: "",
-      inventory: []
+  const uiState = useSignal<UIState>({
+    gameState: {
+      player: {
+        name: "",
+        level: 1,
+        hp: { current: 10, max: 10 },
+        stress: { current: 0, max: 10 },
+        hope: 2,
+        armor: { current: 0, max: 0 },
+        evasion: 10,
+        thresholds: { major: 5, severe: 10 },
+        proficiency: 1,
+        conditions: [],
+        experiences: [],
+        class: "",
+        background: "",
+        currentLocation: "Starting Area",
+        gold: "",
+        inventory: []
+      },
+      gm: {
+        fear: 0,
+        hasSpotlight: false
+      },
+      scene: {
+        currentScene: "Character Creation",
+        sceneDescription: "Du stehst am Beginn eines neuen Abenteuers...",
+        activeQuests: [],
+        countdowns: []
+      },
+      sessionId: "",
+      languageCorrections: 0,
+      vocabularyIntroduced: []
     },
-    currentScene: "Character Creation",
-    sceneDescription: "Du stehst am Beginn eines neuen Abenteuers...",
-    activeQuests: [],
-    conversationHistory: [],
-    sessionId: "",
-    languageCorrections: 0,
-    vocabularyIntroduced: []
+    conversationHistory: []
   });
 
   // Initialize voice chat when component mounts
@@ -239,18 +207,12 @@ export default function VoiceChat(_props: VoiceChatProps) {
 
   // Helper function to update conversation history
   const updateConversationHistory = (history: any[]) => {
-    const newState = { ...gameState.value };
     const formattedHistory: ConversationItem[] = [];
     
     // Debug: Log the raw history to see what we're getting
     console.log('Raw conversation history:', history);
     
     history.forEach((item: any) => {
-      // Debug: Log each item to see its structure
-      // if (item.type === 'function_call' || item.type === 'tool_call') {
-      //   console.log('Found tool call in history:', item);
-      // }
-      
       if (item.type === 'message') {
         let content = '';
         
@@ -311,28 +273,13 @@ export default function VoiceChat(_props: VoiceChatProps) {
           });
         }
       }
-      
-      // Handle function calls and tool calls in the conversation history
-      else if ((item.type === 'function_call' || item.type === 'tool_call') && item.status === 'completed') {
-        const toolName = item.name || item.function_name || 'unknown';
-        const params = item.arguments || item.parameters || {};
-        const output = item.output || item.result || 'No output';
-        
-        // Add to conversation history for display
-        formattedHistory.push({
-          timestamp: new Date().toLocaleTimeString(),
-          role: 'assistant',
-          content: `🔧 Called tool: ${toolName}(${JSON.stringify(params)}) → ${output}`,
-          type: 'message'
-        });
-        
-        // Update game state
-        updateGameState(toolName, params);
-      }
     });
     
-    newState.conversationHistory = formattedHistory;
-    gameState.value = newState;
+    // Update only conversation history, game state updates come from direct messages
+    uiState.value = { 
+      ...uiState.value, 
+      conversationHistory: formattedHistory
+    };
   };
 
   // Set up WebSocket connection
@@ -361,9 +308,23 @@ export default function VoiceChat(_props: VoiceChatProps) {
           isConnected.value = true;
           isConnecting.value = false;
           status.value = "Mit Der Spielleiter verbunden - Sprich jetzt!";
-          gameState.value = { ...gameState.value, sessionId: message.sessionId };
+          uiState.value = { 
+            ...uiState.value, 
+            gameState: { ...uiState.value.gameState, sessionId: message.sessionId }
+          };
           // Start recording audio
           startAudioCapture();
+          break;
+          
+        case 'game_state_updated':
+          // Direct game state update - much more reliable!
+          if (message.gameState) {
+            uiState.value = { 
+              ...uiState.value, 
+              gameState: message.gameState
+            };
+            console.log('Game state updated:', message.toolResult);
+          }
           break;
           
         case 'history_updated':
