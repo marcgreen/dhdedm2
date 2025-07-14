@@ -7,19 +7,24 @@ interface VoiceChatProps {}
 interface CharacterState {
   name: string;
   level: number;
-  hitPoints: number;
-  maxHitPoints: number;
-  attributes: {
-    strength: number;
-    dexterity: number;
-    constitution: number;
-    intelligence: number;
-    wisdom: number;
-    charisma: number;
-  };
-  inventory: string[];
+  hp: number;
+  maxHp: number;
+  stress: number;
+  maxStress: number;
+  hope: number;
+  armor: number;
+  maxArmor: number;
+  evasion: number;
+  proficiency: number;
+  majorThreshold: number;
+  severeThreshold: number;
+  conditions: string[];
+  experiences: string[];
+  class: string;
+  background: string;
   currentLocation: string;
-  notes: string[];
+  gold: string;
+  inventory: string[];
 }
 
 interface GameState {
@@ -58,24 +63,28 @@ export default function VoiceChat(_props: VoiceChatProps) {
     character: {
       name: "",
       level: 1,
-      hitPoints: 10,
-      maxHitPoints: 10,
-      attributes: {
-        strength: 10,
-        dexterity: 10,
-        constitution: 10,
-        intelligence: 10,
-        wisdom: 10,
-        charisma: 10
-      },
-      inventory: [],
+      hp: 10,
+      maxHp: 10,
+      stress: 0,
+      maxStress: 10,
+      hope: 2,
+      armor: 0,
+      maxArmor: 0,
+      evasion: 10,
+      proficiency: 1,
+      majorThreshold: 5,
+      severeThreshold: 10,
+      conditions: [],
+      experiences: [],
+      class: "",
+      background: "",
       currentLocation: "Starting Area",
-      notes: []
+      gold: "",
+      inventory: []
     },
     currentScene: "Character Creation",
     sceneDescription: "Du stehst am Beginn eines neuen Abenteuers...",
     activeQuests: [],
-
     conversationHistory: [],
     sessionId: "",
     languageCorrections: 0,
@@ -103,31 +112,87 @@ export default function VoiceChat(_props: VoiceChatProps) {
     
     // Update game state based on tool calls
     switch (toolName) {
-      case 'update_character':
+      case 'update_player':
         if (parameters.name) newState.character.name = parameters.name;
         if (parameters.level) newState.character.level = parameters.level;
-        if (parameters.hitPoints !== undefined) newState.character.hitPoints = parameters.hitPoints;
-        if (parameters.maxHitPoints) newState.character.maxHitPoints = parameters.maxHitPoints;
+        if (parameters.hp !== undefined) newState.character.hp = parameters.hp;
+        if (parameters.maxHp) newState.character.maxHp = parameters.maxHp;
+        if (parameters.stress !== undefined) newState.character.stress = parameters.stress;
+        if (parameters.maxStress) newState.character.maxStress = parameters.maxStress;
+        if (parameters.hope !== undefined) newState.character.hope = parameters.hope;
+        if (parameters.armor !== undefined) newState.character.armor = parameters.armor;
+        if (parameters.maxArmor) newState.character.maxArmor = parameters.maxArmor;
+        if (parameters.evasion) newState.character.evasion = parameters.evasion;
+        if (parameters.proficiency) newState.character.proficiency = parameters.proficiency;
+        if (parameters.majorThreshold) newState.character.majorThreshold = parameters.majorThreshold;
+        if (parameters.severeThreshold) newState.character.severeThreshold = parameters.severeThreshold;
         if (parameters.location) newState.character.currentLocation = parameters.location;
-        if (parameters.attributes) {
-          newState.character.attributes = { ...newState.character.attributes, ...parameters.attributes };
+        if (parameters.class) newState.character.class = parameters.class;
+        if (parameters.background) newState.character.background = parameters.background;
+        if (parameters.addCondition) {
+          if (!newState.character.conditions.includes(parameters.addCondition)) {
+            newState.character.conditions.push(parameters.addCondition);
+          }
+        }
+        if (parameters.removeCondition) {
+          const index = newState.character.conditions.indexOf(parameters.removeCondition);
+          if (index > -1) {
+            newState.character.conditions.splice(index, 1);
+          }
+        }
+        if (parameters.clearAllConditions) {
+          newState.character.conditions = [];
+        }
+        if (parameters.markExperience) {
+          if (!newState.character.experiences.includes(parameters.markExperience)) {
+            newState.character.experiences.push(parameters.markExperience);
+          }
         }
         break;
         
       case 'update_inventory':
-        if (parameters.action === 'add' && parameters.items) {
-          parameters.items.forEach((item: string) => {
-            if (!newState.character.inventory.includes(item)) {
-              newState.character.inventory.push(item);
+        if (parameters.gold) {
+          newState.character.gold = parameters.gold;
+        }
+        if (parameters.item) {
+          // Initialize inventory if it doesn't exist
+          if (!newState.character.inventory) {
+            newState.character.inventory = [];
+          }
+          
+          const action = parameters.action || 'add';
+          const quantity = parameters.quantity || 1;
+          
+          if (action === 'add') {
+            // Add item (with quantity handling)
+            const existingIndex = newState.character.inventory.findIndex(invItem => 
+              invItem.startsWith(parameters.item)
+            );
+            
+            if (existingIndex > -1) {
+              // Update existing item quantity
+              const existingItem = newState.character.inventory[existingIndex];
+              const match = existingItem.match(/^(.+?)(?:\s*x(\d+))?$/);
+              if (match) {
+                const [, itemName, currentQty] = match;
+                const newQty = (parseInt(currentQty) || 1) + quantity;
+                newState.character.inventory[existingIndex] = `${itemName}${newQty > 1 ? ` x${newQty}` : ''}`;
+              }
+            } else {
+              // Add new item
+              newState.character.inventory.push(
+                quantity > 1 ? `${parameters.item} x${quantity}` : parameters.item
+              );
             }
-          });
-        } else if (parameters.action === 'remove' && parameters.items) {
-          parameters.items.forEach((item: string) => {
-            const index = newState.character.inventory.indexOf(item);
+          } else if (action === 'remove') {
+            // Remove item
+            const index = newState.character.inventory.findIndex(invItem => 
+              invItem.startsWith(parameters.item)
+            );
             if (index > -1) {
               newState.character.inventory.splice(index, 1);
             }
-          });
+          }
         }
         break;
         
@@ -714,25 +779,93 @@ export default function VoiceChat(_props: VoiceChatProps) {
               <span>Name:</span>
               <span class="text-white">{gameState.value.character.name || "Unbekannt"}</span>
             </div>
+            {gameState.value.character.class && (
+              <div class="flex justify-between text-gray-300">
+                <span>Klasse:</span>
+                <span class="text-purple-400">{gameState.value.character.class}</span>
+              </div>
+            )}
+            {gameState.value.character.background && (
+              <div class="flex justify-between text-gray-300">
+                <span>Hintergrund:</span>
+                <span class="text-blue-400">{gameState.value.character.background}</span>
+              </div>
+            )}
             <div class="flex justify-between text-gray-300">
               <span>Stufe:</span>
               <span class="text-white">{gameState.value.character.level}</span>
             </div>
-            <div class="flex justify-between text-gray-300">
-              <span>Lebenspunkte:</span>
-              <span class="text-red-400">{gameState.value.character.hitPoints}/{gameState.value.character.maxHitPoints}</span>
+            
+            {/* Core Stats */}
+            <div class="border-t border-gray-600 pt-3 mt-3">
+              <div class="flex justify-between text-gray-300">
+                <span>Lebenspunkte:</span>
+                <span class="text-red-400">{gameState.value.character.hp}/{gameState.value.character.maxHp}</span>
+              </div>
+              <div class="flex justify-between text-gray-300">
+                <span>Stress:</span>
+                <span class="text-orange-400">{gameState.value.character.stress}/{gameState.value.character.maxStress}</span>
+              </div>
+              <div class="flex justify-between text-gray-300">
+                <span>Hoffnung:</span>
+                <span class="text-yellow-400">{gameState.value.character.hope}</span>
+              </div>
+              <div class="flex justify-between text-gray-300">
+                <span>Rüstung:</span>
+                <span class="text-blue-400">{gameState.value.character.armor}/{gameState.value.character.maxArmor}</span>
+              </div>
             </div>
+            
+            {/* Combat Stats */}
+            <div class="border-t border-gray-600 pt-3 mt-3">
+              <div class="flex justify-between text-gray-300">
+                <span>Ausweichen:</span>
+                <span class="text-green-400">{gameState.value.character.evasion}</span>
+              </div>
+              <div class="flex justify-between text-gray-300">
+                <span>Fertigkeit:</span>
+                <span class="text-cyan-400">{gameState.value.character.proficiency}</span>
+              </div>
+              <div class="flex justify-between text-gray-300">
+                <span>Schwellen:</span>
+                <span class="text-gray-400">{gameState.value.character.majorThreshold}/{gameState.value.character.severeThreshold}</span>
+              </div>
+            </div>
+            
             <div class="flex justify-between text-gray-300">
               <span>Ort:</span>
               <span class="text-blue-400">{gameState.value.character.currentLocation}</span>
             </div>
-            {gameState.value.character.inventory.length > 0 && (
+            
+            {gameState.value.character.gold && (
+              <div class="flex justify-between text-gray-300">
+                <span>Gold:</span>
+                <span class="text-yellow-400">{gameState.value.character.gold}</span>
+              </div>
+            )}
+            
+            {/* Conditions */}
+            {gameState.value.character.conditions && gameState.value.character.conditions.length > 0 && (
               <div class="mt-4">
-                <div class="text-gray-400 mb-2">Inventar:</div>
+                <div class="text-gray-400 mb-2">Zustände:</div>
                 <div class="flex flex-wrap gap-1">
-                  {gameState.value.character.inventory.map((item, index) => (
-                    <span key={index} class="bg-slate-700 px-2 py-1 rounded text-xs text-gray-300">
-                      {item}
+                  {gameState.value.character.conditions.map((condition, index) => (
+                    <span key={index} class="bg-red-900 px-2 py-1 rounded text-xs text-red-300">
+                      {condition}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {/* Experiences */}
+            {gameState.value.character.experiences && gameState.value.character.experiences.length > 0 && (
+              <div class="mt-4">
+                <div class="text-gray-400 mb-2">Erfahrungen:</div>
+                <div class="flex flex-wrap gap-1">
+                  {gameState.value.character.experiences.map((experience, index) => (
+                    <span key={index} class="bg-purple-900 px-2 py-1 rounded text-xs text-purple-300">
+                      {experience}
                     </span>
                   ))}
                 </div>
@@ -758,6 +891,20 @@ export default function VoiceChat(_props: VoiceChatProps) {
                     <div key={index} class="bg-slate-700 p-2 rounded text-xs text-gray-300">
                       • {quest}
                     </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {/* Inventory */}
+            {gameState.value.character.inventory && gameState.value.character.inventory.length > 0 && (
+              <div class="mt-4">
+                <div class="text-gray-400 mb-2">Inventar:</div>
+                <div class="flex flex-wrap gap-1">
+                  {gameState.value.character.inventory.map((item, index) => (
+                    <span key={index} class="bg-slate-700 px-2 py-1 rounded text-xs text-gray-300">
+                      {item}
+                    </span>
                   ))}
                 </div>
               </div>
