@@ -74,136 +74,7 @@ export default function VoiceChat(_props: VoiceChatProps) {
       });
   }, []);
 
-  // Helper function to update game state based on tool calls
-  const updateGameState = (toolName: string, parameters: any) => {
-    const newState = { ...gameState.value };
-    
-    // Update game state based on tool calls
-    switch (toolName) {
-      case 'update_player':
-        if (parameters.name) newState.character.name = parameters.name;
-        if (parameters.level) newState.character.level = parameters.level;
-        if (parameters.hp !== undefined) newState.character.hp = parameters.hp;
-        if (parameters.maxHp) newState.character.maxHp = parameters.maxHp;
-        if (parameters.stress !== undefined) newState.character.stress = parameters.stress;
-        if (parameters.maxStress) newState.character.maxStress = parameters.maxStress;
-        if (parameters.hope !== undefined) newState.character.hope = parameters.hope;
-        if (parameters.armor !== undefined) newState.character.armor = parameters.armor;
-        if (parameters.maxArmor) newState.character.maxArmor = parameters.maxArmor;
-        if (parameters.evasion) newState.character.evasion = parameters.evasion;
-        if (parameters.proficiency) newState.character.proficiency = parameters.proficiency;
-        if (parameters.majorThreshold) newState.character.majorThreshold = parameters.majorThreshold;
-        if (parameters.severeThreshold) newState.character.severeThreshold = parameters.severeThreshold;
-        if (parameters.location) newState.character.currentLocation = parameters.location;
-        if (parameters.class) newState.character.class = parameters.class;
-        if (parameters.background) newState.character.background = parameters.background;
-        if (parameters.addCondition) {
-          if (!newState.character.conditions.includes(parameters.addCondition)) {
-            newState.character.conditions.push(parameters.addCondition);
-          }
-        }
-        if (parameters.removeCondition) {
-          const index = newState.character.conditions.indexOf(parameters.removeCondition);
-          if (index > -1) {
-            newState.character.conditions.splice(index, 1);
-          }
-        }
-        if (parameters.clearAllConditions) {
-          newState.character.conditions = [];
-        }
-        if (parameters.markExperience) {
-          if (!newState.character.experiences.includes(parameters.markExperience)) {
-            newState.character.experiences.push(parameters.markExperience);
-          }
-        }
-        break;
-        
-      case 'update_inventory':
-        if (parameters.gold) {
-          newState.character.gold = parameters.gold;
-        }
-        if (parameters.item) {
-          // Initialize inventory if it doesn't exist
-          if (!newState.character.inventory) {
-            newState.character.inventory = [];
-          }
-          
-          const action = parameters.action || 'add';
-          const quantity = parameters.quantity || 1;
-          
-          if (action === 'add') {
-            // Add item (with quantity handling)
-            const existingIndex = newState.character.inventory.findIndex(invItem => 
-              invItem.startsWith(parameters.item)
-            );
-            
-            if (existingIndex > -1) {
-              // Update existing item quantity
-              const existingItem = newState.character.inventory[existingIndex];
-              const match = existingItem.match(/^(.+?)(?:\s*x(\d+))?$/);
-              if (match) {
-                const [, itemName, currentQty] = match;
-                const newQty = (parseInt(currentQty) || 1) + quantity;
-                newState.character.inventory[existingIndex] = `${itemName}${newQty > 1 ? ` x${newQty}` : ''}`;
-              }
-            } else {
-              // Add new item
-              newState.character.inventory.push(
-                quantity > 1 ? `${parameters.item} x${quantity}` : parameters.item
-              );
-            }
-          } else if (action === 'remove') {
-            // Remove item
-            const index = newState.character.inventory.findIndex(invItem => 
-              invItem.startsWith(parameters.item)
-            );
-            if (index > -1) {
-              newState.character.inventory.splice(index, 1);
-            }
-          }
-        }
-        break;
-        
-      case 'update_scene':
-        if (parameters.scene) newState.currentScene = parameters.scene;
-        if (parameters.description) newState.sceneDescription = parameters.description;
-        if (parameters.location) newState.character.currentLocation = parameters.location;
-        break;
-        
-      case 'manage_quests':
-        if (parameters.action === 'add' && parameters.quest) {
-          if (!newState.activeQuests.includes(parameters.quest)) {
-            newState.activeQuests.push(parameters.quest);
-          }
-        } else if (parameters.action === 'complete' && parameters.quest) {
-          const index = newState.activeQuests.indexOf(parameters.quest);
-          if (index > -1) {
-            newState.activeQuests.splice(index, 1);
-          }
-        } else if (parameters.action === 'update' && parameters.quest && parameters.index !== undefined) {
-          if (newState.activeQuests[parameters.index]) {
-            newState.activeQuests[parameters.index] = parameters.quest;
-          }
-        }
-        break;
-        
-      case 'track_language':
-        if (parameters.corrections) {
-          newState.languageCorrections += parameters.corrections;
-        }
-        if (parameters.newVocabulary && Array.isArray(parameters.newVocabulary)) {
-          parameters.newVocabulary.forEach((word: string) => {
-            if (!newState.vocabularyIntroduced.includes(word)) {
-              newState.vocabularyIntroduced.push(word);
-            }
-          });
-        }
-        break;
-    }
-    
-    gameState.value = newState;
-    console.log(`Tool Called: ${toolName}`, { parameters });
-  };
+  // Game state updates now come directly from the backend via WebSocket messages
 
   // Helper function to update conversation history
   const updateConversationHistory = (history: any[]) => {
@@ -339,14 +210,7 @@ export default function VoiceChat(_props: VoiceChatProps) {
           }
           break;
           
-                  case 'tool_executed':
-          // Handle tool execution results
-          if (message.result) {
-            const toolName = message.result.name || 'unknown';
-            const params = message.result.parameters || {};
-            updateGameState(toolName, params);
-          }
-          break;
+        
           
         case 'error':
           const errorMsg = typeof message.error === 'string' ? message.error : JSON.stringify(message.error);
@@ -738,42 +602,42 @@ export default function VoiceChat(_props: VoiceChatProps) {
           <div class="space-y-3 text-sm">
             <div class="flex justify-between text-gray-300">
               <span>Name:</span>
-              <span class="text-white">{gameState.value.character.name || "Unbekannt"}</span>
+              <span class="text-white">{uiState.value.gameState.player.name || "Unbekannt"}</span>
             </div>
-            {gameState.value.character.class && (
+            {uiState.value.gameState.player.class && (
               <div class="flex justify-between text-gray-300">
                 <span>Klasse:</span>
-                <span class="text-purple-400">{gameState.value.character.class}</span>
+                <span class="text-purple-400">{uiState.value.gameState.player.class}</span>
               </div>
             )}
-            {gameState.value.character.background && (
+            {uiState.value.gameState.player.background && (
               <div class="flex justify-between text-gray-300">
                 <span>Hintergrund:</span>
-                <span class="text-blue-400">{gameState.value.character.background}</span>
+                <span class="text-blue-400">{uiState.value.gameState.player.background}</span>
               </div>
             )}
             <div class="flex justify-between text-gray-300">
               <span>Stufe:</span>
-              <span class="text-white">{gameState.value.character.level}</span>
+              <span class="text-white">{uiState.value.gameState.player.level}</span>
             </div>
             
             {/* Core Stats */}
             <div class="border-t border-gray-600 pt-3 mt-3">
               <div class="flex justify-between text-gray-300">
                 <span>Lebenspunkte:</span>
-                <span class="text-red-400">{gameState.value.character.hp}/{gameState.value.character.maxHp}</span>
+                <span class="text-red-400">{uiState.value.gameState.player.hp.current}/{uiState.value.gameState.player.hp.max}</span>
               </div>
               <div class="flex justify-between text-gray-300">
                 <span>Stress:</span>
-                <span class="text-orange-400">{gameState.value.character.stress}/{gameState.value.character.maxStress}</span>
+                <span class="text-orange-400">{uiState.value.gameState.player.stress.current}/{uiState.value.gameState.player.stress.max}</span>
               </div>
               <div class="flex justify-between text-gray-300">
                 <span>Hoffnung:</span>
-                <span class="text-yellow-400">{gameState.value.character.hope}</span>
+                <span class="text-yellow-400">{uiState.value.gameState.player.hope}</span>
               </div>
               <div class="flex justify-between text-gray-300">
                 <span>Rüstung:</span>
-                <span class="text-blue-400">{gameState.value.character.armor}/{gameState.value.character.maxArmor}</span>
+                <span class="text-blue-400">{uiState.value.gameState.player.armor.current}/{uiState.value.gameState.player.armor.max}</span>
               </div>
             </div>
             
@@ -781,36 +645,36 @@ export default function VoiceChat(_props: VoiceChatProps) {
             <div class="border-t border-gray-600 pt-3 mt-3">
               <div class="flex justify-between text-gray-300">
                 <span>Ausweichen:</span>
-                <span class="text-green-400">{gameState.value.character.evasion}</span>
+                <span class="text-green-400">{uiState.value.gameState.player.evasion}</span>
               </div>
               <div class="flex justify-between text-gray-300">
                 <span>Fertigkeit:</span>
-                <span class="text-cyan-400">{gameState.value.character.proficiency}</span>
+                <span class="text-cyan-400">{uiState.value.gameState.player.proficiency}</span>
               </div>
               <div class="flex justify-between text-gray-300">
                 <span>Schwellen:</span>
-                <span class="text-gray-400">{gameState.value.character.majorThreshold}/{gameState.value.character.severeThreshold}</span>
+                <span class="text-gray-400">{uiState.value.gameState.player.thresholds.major}/{uiState.value.gameState.player.thresholds.severe}</span>
               </div>
             </div>
             
             <div class="flex justify-between text-gray-300">
               <span>Ort:</span>
-              <span class="text-blue-400">{gameState.value.character.currentLocation}</span>
+              <span class="text-blue-400">{uiState.value.gameState.player.currentLocation}</span>
             </div>
             
-            {gameState.value.character.gold && (
+            {uiState.value.gameState.player.gold && (
               <div class="flex justify-between text-gray-300">
                 <span>Gold:</span>
-                <span class="text-yellow-400">{gameState.value.character.gold}</span>
+                <span class="text-yellow-400">{uiState.value.gameState.player.gold}</span>
               </div>
             )}
             
             {/* Conditions */}
-            {gameState.value.character.conditions && gameState.value.character.conditions.length > 0 && (
+            {uiState.value.gameState.player.conditions && uiState.value.gameState.player.conditions.length > 0 && (
               <div class="mt-4">
                 <div class="text-gray-400 mb-2">Zustände:</div>
                 <div class="flex flex-wrap gap-1">
-                  {gameState.value.character.conditions.map((condition, index) => (
+                  {uiState.value.gameState.player.conditions.map((condition, index) => (
                     <span key={index} class="bg-red-900 px-2 py-1 rounded text-xs text-red-300">
                       {condition}
                     </span>
@@ -820,11 +684,11 @@ export default function VoiceChat(_props: VoiceChatProps) {
             )}
             
             {/* Experiences */}
-            {gameState.value.character.experiences && gameState.value.character.experiences.length > 0 && (
+            {uiState.value.gameState.player.experiences && uiState.value.gameState.player.experiences.length > 0 && (
               <div class="mt-4">
                 <div class="text-gray-400 mb-2">Erfahrungen:</div>
                 <div class="flex flex-wrap gap-1">
-                  {gameState.value.character.experiences.map((experience, index) => (
+                  {uiState.value.gameState.player.experiences.map((experience, index) => (
                     <span key={index} class="bg-purple-900 px-2 py-1 rounded text-xs text-purple-300">
                       {experience}
                     </span>
@@ -841,14 +705,14 @@ export default function VoiceChat(_props: VoiceChatProps) {
             🏰 Aktuelle Szene
           </h2>
           <div class="space-y-3 text-sm">
-            <div class="text-yellow-400 font-medium">{gameState.value.currentScene}</div>
-            <div class="text-gray-300 leading-relaxed">{gameState.value.sceneDescription}</div>
+            <div class="text-yellow-400 font-medium">{uiState.value.gameState.scene.currentScene}</div>
+            <div class="text-gray-300 leading-relaxed">{uiState.value.gameState.scene.sceneDescription}</div>
             
-            {gameState.value.activeQuests.length > 0 && (
+            {uiState.value.gameState.scene.activeQuests.length > 0 && (
               <div class="mt-4">
                 <div class="text-gray-400 mb-2">Aktive Quests:</div>
                 <div class="space-y-1">
-                  {gameState.value.activeQuests.map((quest, index) => (
+                  {uiState.value.gameState.scene.activeQuests.map((quest, index) => (
                     <div key={index} class="bg-slate-700 p-2 rounded text-xs text-gray-300">
                       • {quest}
                     </div>
@@ -858,11 +722,11 @@ export default function VoiceChat(_props: VoiceChatProps) {
             )}
             
             {/* Inventory */}
-            {gameState.value.character.inventory && gameState.value.character.inventory.length > 0 && (
+            {uiState.value.gameState.player.inventory && uiState.value.gameState.player.inventory.length > 0 && (
               <div class="mt-4">
                 <div class="text-gray-400 mb-2">Inventar:</div>
                 <div class="flex flex-wrap gap-1">
-                  {gameState.value.character.inventory.map((item, index) => (
+                  {uiState.value.gameState.player.inventory.map((item, index) => (
                     <span key={index} class="bg-slate-700 px-2 py-1 rounded text-xs text-gray-300">
                       {item}
                     </span>
@@ -881,17 +745,17 @@ export default function VoiceChat(_props: VoiceChatProps) {
           <div class="space-y-3 text-sm">
             <div class="flex justify-between text-gray-300">
               <span>Korrekturen:</span>
-              <span class="text-orange-400">{gameState.value.languageCorrections}</span>
+              <span class="text-orange-400">{uiState.value.gameState.languageCorrections}</span>
             </div>
             <div class="flex justify-between text-gray-300">
               <span>Neues Vokabular:</span>
-              <span class="text-green-400">{gameState.value.vocabularyIntroduced.length}</span>
+              <span class="text-green-400">{uiState.value.gameState.vocabularyIntroduced.length}</span>
             </div>
-            {gameState.value.vocabularyIntroduced.length > 0 && (
+            {uiState.value.gameState.vocabularyIntroduced.length > 0 && (
               <div class="mt-4">
                 <div class="text-gray-400 mb-2">Gelernte Wörter:</div>
                 <div class="flex flex-wrap gap-1">
-                  {gameState.value.vocabularyIntroduced.slice(-10).map((word, index) => (
+                  {uiState.value.gameState.vocabularyIntroduced.slice(-10).map((word, index) => (
                     <span key={index} class="bg-green-900 px-2 py-1 rounded text-xs text-green-300">
                       {word}
                     </span>
@@ -908,11 +772,11 @@ export default function VoiceChat(_props: VoiceChatProps) {
         <div class="bg-slate-800 p-6 rounded-xl shadow-xl">
           <h2 class="text-xl font-bold text-white mb-4 flex items-center">
             💬 Unterhaltung
-            <span class="ml-2 text-sm text-gray-400">({gameState.value.conversationHistory.length})</span>
+            <span class="ml-2 text-sm text-gray-400">({uiState.value.conversationHistory.length})</span>
           </h2>
           <div class="space-y-3 text-sm max-h-64 overflow-y-auto">
-            {gameState.value.conversationHistory.length > 0 ? (
-              gameState.value.conversationHistory.slice(-20).map((message, index) => (
+            {uiState.value.conversationHistory.length > 0 ? (
+              uiState.value.conversationHistory.slice(-20).map((message, index) => (
                 <div key={index} class={`p-3 rounded-lg ${
                   message.role === 'user' 
                     ? 'bg-blue-900 ml-4 border-l-2 border-blue-400' 
