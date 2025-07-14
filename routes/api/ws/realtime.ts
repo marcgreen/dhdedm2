@@ -134,7 +134,7 @@ const createDaggerheartTools = (sessionId: string) => {
       additionalProperties: true,
     },
     async execute(args: any) {
-      const rolls = [];
+      const rolls: number[] = [];
       const count = args.count || 1;
       const modifier = args.modifier || 0;
       
@@ -336,7 +336,7 @@ export const handler: Handlers = {
               const tools = createDaggerheartTools(sessionId!);
               console.log('Daggerheart tools created successfully');
 
-              const daggerheartRules = ```# Daggerheart DM System
+              const daggerheartRules = `# Daggerheart DM System
 
 You are the Game Master for Daggerheart, a collaborative storytelling RPG. Your role is to bring the world to life, challenge the player, and ensure the rules are followed while keeping the story moving.
 
@@ -771,7 +771,7 @@ Keep players engaged with optional goals:
 - Critical damage is maximum PLUS rolled damage
 - The spotlight system controls pacing - use it well
 
-Always respond in character as the GM. Keep descriptions concise but evocative. Focus on what the player character experiences. Play to find out what happens!```;
+Always respond in character as the GM. Keep descriptions concise but evocative. Focus on what the player character experiences. Play to find out what happens!`;
               
               const agent = new RealtimeAgent({
                 name: 'Der Spielleiter',
