@@ -23,7 +23,11 @@ export default function VoiceChat(_props: VoiceChatProps) {
   const isPlayingAudioRef = useRef<boolean>(false);
   const nextPlayTimeRef = useRef<number>(0);
   const lastUserSpeechTimeRef = useRef<number>(0);
-  const lastAssistantMessageRef = useRef<ConversationItem | null>(null);
+  
+  // Local conversation history - client-side authoritative store
+  const localConversationRef = useRef<ConversationItem[]>([]);
+  const currentAssistantMessageRef = useRef<ConversationItem | null>(null);
+  const lastSyncTimeRef = useRef<number>(0);
   const uiState = useSignal<UIState>({
     gameState: {
       player: {
@@ -78,25 +82,83 @@ export default function VoiceChat(_props: VoiceChatProps) {
 
   // Game state updates now come directly from the backend via WebSocket messages
 
-  // Helper function to update conversation history
-  const updateConversationHistory = (history: any[]) => {
-    const formattedHistory: ConversationItem[] = [];
+  // Merge local and server conversation histories, preserving interrupted messages and timestamps
+  const mergeConversationHistories = (localHistory: ConversationItem[], serverHistory: ConversationItem[]): ConversationItem[] => {
+    console.log('=== MERGE START ===');
+    console.log('Local history:', localHistory.length, 'messages');
+    console.log('Server history:', serverHistory.length, 'messages');
     
-    // Debug: Log the raw history to see what we're getting
-    console.log('Raw conversation history:', history);
-    console.log('History length:', history.length);
+    // If we have very few local messages, prefer server history to avoid conflicts
+    if (localHistory.length <= 1) {
+      console.log('Using server history as primary (local history too small)');
+      return [...serverHistory];
+    }
     
-    // Debug: Log each item to see what's happening to interrupted messages
-    history.forEach((item, index) => {
-      console.log(`History item ${index}:`, {
-        type: item.type,
-        role: item.role,
-        status: item.status,
-        hasContent: !!item.content,
-        contentType: typeof item.content,
-        contentLength: Array.isArray(item.content) ? item.content.length : (item.content ? item.content.length : 0)
-      });
+    // Create a combined array with all messages, using local timestamps where available
+    const allMessages: ConversationItem[] = [];
+    
+         // Create a content-based lookup for local messages to preserve timestamps
+     const localMessageMap = new Map<string, ConversationItem>();
+     localHistory.forEach((msg) => {
+       const contentKey = msg.content.replace(' ⚠️ (unterbrochen)', '').replace(' ⏸️ (unvollständig)', '').substring(0, 40);
+       const key = `${msg.role}_${contentKey}`;
+       localMessageMap.set(key, msg);
+     });
+    
+    // Process server messages, preserving local data where possible
+    serverHistory.forEach(serverMsg => {
+      const contentKey = serverMsg.content.substring(0, 40);
+      const key = `${serverMsg.role}_${contentKey}`;
+      const localMatch = localMessageMap.get(key);
+      
+      if (localMatch) {
+        // Use local version (preserves timestamp and interruption status)
+        console.log('Preserving local message:', localMatch.timestamp);
+        allMessages.push({
+          ...serverMsg,
+          timestamp: localMatch.timestamp,
+          content: localMatch.content // Keeps interruption markers
+        });
+        localMessageMap.delete(key); // Mark as used
+      } else {
+        // New server message
+        allMessages.push(serverMsg);
+      }
     });
+    
+    // Add any remaining local messages that weren't in server history (like interrupted ones)
+    for (const [key, localMsg] of localMessageMap) {
+      if (localMsg.content.includes('(unterbrochen)') || localMsg.content.includes('(unvollständig)')) {
+        console.log('Adding orphaned interrupted message:', localMsg.content.substring(0, 50));
+        allMessages.push(localMsg);
+      }
+    }
+    
+    // Sort by timestamp to ensure chronological order
+    allMessages.sort((a, b) => {
+      // Convert timestamps to comparable format for sorting
+      const timeA = new Date(`1970-01-01 ${a.timestamp}`).getTime();
+      const timeB = new Date(`1970-01-01 ${b.timestamp}`).getTime();
+      return timeA - timeB;
+    });
+    
+    console.log('Final merged history:', allMessages.length, 'messages in chronological order');
+    console.log('=== MERGE END ===');
+    
+    return allMessages;
+  };
+
+  // Helper function to sync with server conversation history
+  const syncConversationHistory = (history: any[]) => {
+    // Throttle rapid sync calls to prevent race conditions
+    const now = Date.now();
+    if (now - lastSyncTimeRef.current < 500) { // 500ms throttle
+      console.log('Skipping sync - too soon since last sync');
+      return;
+    }
+    lastSyncTimeRef.current = now;
+    
+    const formattedHistory: ConversationItem[] = [];
     
     history.forEach((item: any) => {
       if (item.type === 'message') {
@@ -158,8 +220,17 @@ export default function VoiceChat(_props: VoiceChatProps) {
             displayContent += ` ${item.status === 'interrupted' ? '⚠️ (unterbrochen)' : '⏸️ (unvollständig)'}`;
           }
           
+          // Try to preserve original timestamp from server, fallback to current time
+          let messageTimestamp = new Date().toLocaleTimeString();
+          if (item.timestamp) {
+            messageTimestamp = item.timestamp;
+          } else if (item.created_at) {
+            // Convert server timestamp to local time format
+            messageTimestamp = new Date(item.created_at).toLocaleTimeString();
+          }
+          
           formattedHistory.push({
-            timestamp: new Date().toLocaleTimeString(),
+            timestamp: messageTimestamp,
             role: item.role === 'user' ? 'user' : 'assistant',
             content: displayContent,
             type: 'message'
@@ -168,58 +239,16 @@ export default function VoiceChat(_props: VoiceChatProps) {
       }
     });
     
-    // Debug: Log the final formatted history
-    console.log('Formatted history items:', formattedHistory.length);
-    formattedHistory.forEach((item, index) => {
-      console.log(`Formatted item ${index}:`, {
-        role: item.role,
-        contentPreview: item.content.substring(0, 50) + '...',
-        timestamp: item.timestamp
-      });
-    });
+    // Merge server history with local history, preserving interrupted messages
+    const mergedHistory = mergeConversationHistories(localConversationRef.current, formattedHistory);
+    localConversationRef.current = mergedHistory;
     
-    // Check if we lost the last assistant message due to interruption
-    const lastAssistantInNew = formattedHistory.filter(item => item.role === 'assistant').pop();
-    const hadLastAssistant = lastAssistantMessageRef.current !== null;
+    console.log('Merged server history with local store:', mergedHistory.length, 'messages');
     
-    // If we had a last assistant message but it's missing from new history, preserve it
-    if (hadLastAssistant && lastAssistantMessageRef.current && 
-        (!lastAssistantInNew || lastAssistantInNew.content !== lastAssistantMessageRef.current.content)) {
-      
-      console.log('Preserving interrupted assistant message:', lastAssistantMessageRef.current.content.substring(0, 50) + '...');
-      
-      // Find the right place to insert the preserved message
-      const preservedMessage = {
-        ...lastAssistantMessageRef.current,
-        content: lastAssistantMessageRef.current.content + ' ⚠️ (unterbrochen)'
-      };
-      
-      // Insert before the last user message (the interruption)
-      let lastUserIndex = -1;
-      for (let i = formattedHistory.length - 1; i >= 0; i--) {
-        if (formattedHistory[i].role === 'user') {
-          lastUserIndex = i;
-          break;
-        }
-      }
-      
-      if (lastUserIndex > 0) {
-        formattedHistory.splice(lastUserIndex, 0, preservedMessage);
-      } else {
-        formattedHistory.push(preservedMessage);
-      }
-    }
-    
-    // Update the last assistant message reference
-    const currentLastAssistant = formattedHistory.filter(item => item.role === 'assistant').pop();
-    if (currentLastAssistant) {
-      lastAssistantMessageRef.current = currentLastAssistant;
-    }
-    
-    // Update only conversation history, game state updates come from direct messages
+    // Update UI state with the merged conversation history
     uiState.value = { 
       ...uiState.value, 
-      conversationHistory: formattedHistory
+      conversationHistory: [...localConversationRef.current]
     };
   };
 
@@ -253,6 +282,8 @@ export default function VoiceChat(_props: VoiceChatProps) {
             ...uiState.value, 
             gameState: { ...uiState.value.gameState, sessionId: message.sessionId }
           };
+          // Clear local conversation history for new session
+          clearLocalConversation();
           // Start recording audio
           startAudioCapture();
           break;
@@ -269,7 +300,7 @@ export default function VoiceChat(_props: VoiceChatProps) {
           break;
           
         case 'history_updated':
-          updateConversationHistory(message.history);
+          syncConversationHistory(message.history);
           break;
           
         case 'audio':
@@ -277,6 +308,12 @@ export default function VoiceChat(_props: VoiceChatProps) {
             playAudio(message.audio);
           } else {
             console.warn('Received audio message but no audio data');
+          }
+          
+          // Check if this audio message also has transcript info for real-time updates
+          if (message.transcript) {
+            console.log('Real-time transcript received:', message.transcript.substring(0, 50) + '...');
+            addOrUpdateLocalMessage('assistant', message.transcript, false);
           }
           break;
           
@@ -299,10 +336,16 @@ export default function VoiceChat(_props: VoiceChatProps) {
           isConnected.value = false;
           status.value = "Disconnected";
           stopAudioCapture();
+          clearLocalConversation();
           break;
         
         default:
-          console.warn('Unknown message type:', message.type, message);
+          console.log('Unknown message type:', message.type, message);
+          
+          // Check if it's a transcript-related message we should handle
+          if (message.transcript || (message.type && message.type.includes('transcript'))) {
+            console.log('Potential transcript message:', message);
+          }
       }
     } catch (error) {
       console.error('Error parsing WebSocket message:', error, event.data);
@@ -518,7 +561,97 @@ export default function VoiceChat(_props: VoiceChatProps) {
     nextPlayTimeRef.current = 0;
     lastUserSpeechTimeRef.current = 0;
     
+    // Handle interruption in conversation history
+    handleInterruption();
+    
     console.log('Audio queue cleared due to interruption');
+  };
+
+  // Clear local conversation history (for session reset)
+  const clearLocalConversation = () => {
+    localConversationRef.current = [];
+    currentAssistantMessageRef.current = null;
+    lastSyncTimeRef.current = 0; // Reset sync throttle
+    console.log('Local conversation history cleared');
+  };
+
+  // Add or update a message in local conversation history
+  const addOrUpdateLocalMessage = (role: 'user' | 'assistant', content: string, isComplete = false) => {
+    const timestamp = new Date().toLocaleTimeString();
+    
+    if (role === 'assistant') {
+      // For assistant messages, update the current one or create new
+      if (currentAssistantMessageRef.current) {
+        // Update existing message content but keep original timestamp
+        currentAssistantMessageRef.current.content = content;
+        // DON'T update timestamp - keep the original time when message started
+        
+        // Update in local history
+        const lastIndex = localConversationRef.current.length - 1;
+        if (lastIndex >= 0 && localConversationRef.current[lastIndex].role === 'assistant') {
+          localConversationRef.current[lastIndex] = { ...currentAssistantMessageRef.current };
+        }
+      } else {
+        // Create new assistant message with current timestamp (when AI starts speaking)
+        currentAssistantMessageRef.current = {
+          timestamp, // This timestamp stays fixed for the entire message
+          role: 'assistant',
+          content,
+          type: 'message'
+        };
+        localConversationRef.current.push({ ...currentAssistantMessageRef.current });
+      }
+      
+      // If message is complete, clear current reference
+      if (isComplete) {
+        currentAssistantMessageRef.current = null;
+      }
+    } else {
+      // For user messages, always create new
+      localConversationRef.current.push({
+        timestamp,
+        role: 'user',
+        content,
+        type: 'message'
+      });
+    }
+    
+    // Update UI
+    uiState.value = { 
+      ...uiState.value, 
+      conversationHistory: [...localConversationRef.current]
+    };
+  };
+
+  // Handle interruption - mark current assistant message as interrupted
+  const handleInterruption = () => {
+    if (currentAssistantMessageRef.current) {
+      console.log('Marking assistant message as interrupted:', currentAssistantMessageRef.current.content.substring(0, 50) + '...');
+      
+      // Only add interrupted marker if not already present
+      if (!currentAssistantMessageRef.current.content.includes('(unterbrochen)')) {
+        currentAssistantMessageRef.current.content += ' ⚠️ (unterbrochen)';
+      }
+      
+      // Update in local history
+      const lastIndex = localConversationRef.current.length - 1;
+      if (lastIndex >= 0 && localConversationRef.current[lastIndex].role === 'assistant') {
+        localConversationRef.current[lastIndex] = { ...currentAssistantMessageRef.current };
+        console.log('Updated interrupted message in local history at index:', lastIndex);
+      }
+      
+      currentAssistantMessageRef.current = null;
+      
+      // Update UI immediately to show the interrupted message
+      uiState.value = { 
+        ...uiState.value, 
+        conversationHistory: [...localConversationRef.current]
+      };
+      
+      console.log('Total messages in local history after interruption:', localConversationRef.current.length);
+    } else {
+      console.log('No current assistant message to mark as interrupted');
+    }
   };
 
   // Stop audio capture and clear audio queue
@@ -633,6 +766,7 @@ export default function VoiceChat(_props: VoiceChatProps) {
       }
       
       stopAudioCapture();
+      clearLocalConversation();
       isConnected.value = false;
       isConnecting.value = false;
       status.value = "Ready to start";
@@ -643,6 +777,7 @@ export default function VoiceChat(_props: VoiceChatProps) {
       isConnected.value = false;
       isConnecting.value = false;
       wsRef.current = null;
+      clearLocalConversation();
     }
   };
 
