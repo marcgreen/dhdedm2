@@ -202,4 +202,191 @@ Deno.test("session isolation", () => {
   assertEquals(state1.player.hope, 5);
   assertEquals(state2.player.name, 'Greta');
   assertEquals(state2.player.hope, 2);
+});
+
+// Phase 2 Tests - Combat System
+
+Deno.test("rollDamage calculates damage correctly", () => {
+  const gameManager = createTestManager();
+  
+  const result = gameManager.rollDamage({
+    weaponDice: "1d8+2",
+    proficiency: 2,
+    isCritical: false,
+    fearBonus: 0
+  });
+  
+  // Basic validation
+  assert(Array.isArray(result.rolls));
+  assert(result.rolls.length === 1);
+  assert(result.rolls[0] >= 1 && result.rolls[0] <= 8);
+  
+  // Should be: (roll * proficiency) + static modifier
+  const expectedTotal = (result.rolls[0] * 2) + 2;
+  assertEquals(result.total, expectedTotal);
+  
+  assert(result.breakdown.includes('1d8×2+2'));
+});
+
+Deno.test("rollDamage with critical hit", () => {
+  const gameManager = createTestManager();
+  
+  const result = gameManager.rollDamage({
+    weaponDice: "1d8",
+    proficiency: 2,
+    isCritical: true
+  });
+  
+  // Critical should add max damage (8 for d8)
+  const expectedTotal = (result.rolls[0] * 2) + 8;
+  assertEquals(result.total, expectedTotal);
+  assertEquals(result.maxDamage, 8);
+});
+
+Deno.test("rollDamage with fear bonus", () => {
+  const gameManager = createTestManager();
+  
+  const result = gameManager.rollDamage({
+    weaponDice: "1d6",
+    proficiency: 1,
+    fearBonus: 2
+  });
+  
+  // Should have 2 fear bonus d4 rolls
+  assertEquals(result.fearBonusRolls.length, 2);
+  result.fearBonusRolls.forEach(roll => {
+    assert(roll >= 1 && roll <= 4);
+  });
+});
+
+Deno.test("dealDamageToPlayer with thresholds", () => {
+  const gameManager = createTestManager();
+  
+  // Remove armor to test pure thresholds
+  gameManager.updatePlayer({ armor: 0 });
+  
+  // Test minor damage (below major threshold)
+  const result1 = gameManager.dealDamageToPlayer({ damage: 3 });
+  assertEquals(result1.hpLost, 1);
+  assertEquals(result1.thresholdReached, 'minor');
+  
+  // Create fresh manager for next test
+  const gameManager2 = createTestManager();
+  gameManager2.updatePlayer({ armor: 0 });
+  
+  // Test major damage (at major threshold)
+  const result2 = gameManager2.dealDamageToPlayer({ damage: 5 });
+  assertEquals(result2.hpLost, 2);
+  assertEquals(result2.thresholdReached, 'major');
+  
+  // Create fresh manager for next test
+  const gameManager3 = createTestManager();
+  gameManager3.updatePlayer({ armor: 0 });
+  
+  // Test severe damage (at severe threshold)
+  const result3 = gameManager3.dealDamageToPlayer({ damage: 10 });
+  assertEquals(result3.hpLost, 3);
+  assertEquals(result3.thresholdReached, 'severe');
+});
+
+Deno.test("dealDamageToPlayer with armor", () => {
+  const gameManager = createTestManager();
+  
+  // Set up armor
+  gameManager.updatePlayer({ armor: 2 });
+  
+  // Attack that would hit major threshold - armor should reduce
+  const result = gameManager.dealDamageToPlayer({ damage: 7 }); // Above major (5)
+  
+  assertEquals(result.armorUsed, true);
+  assert(result.damageAfterReduction < 7); // Damage should be reduced
+  
+  // Verify armor was consumed
+  const state = gameManager.getState();
+  assertEquals(state.player.armor.current, 1);
+});
+
+Deno.test("dealDamageToPlayer immunity", () => {
+  const gameManager = createTestManager();
+  
+  const result = gameManager.dealDamageToPlayer({ 
+    damage: 20, 
+    immunity: true 
+  });
+  
+  assertEquals(result.hpLost, 0);
+  assertEquals(result.thresholdReached, 'none');
+  
+  // HP should be unchanged
+  const state = gameManager.getState();
+  assertEquals(state.player.hp.current, DEFAULT_HP);
+});
+
+Deno.test("makeAdversaryAttack mechanics", () => {
+  const gameManager = createTestManager();
+  
+  const result = gameManager.makeAdversaryAttack({
+    attackBonus: 5,
+    targetEvasion: 12
+  });
+  
+  // Basic validation
+  assert(result.attackRoll >= 1 && result.attackRoll <= 20);
+  assertEquals(result.total, result.attackRoll + 5);
+  assertEquals(result.targetEvasion, 12);
+  
+  // Hit logic
+  const expectedHit = result.total >= 12 || result.attackRoll === 20;
+  assertEquals(result.hit, expectedHit);
+  
+  // Critical logic
+  assertEquals(result.isCritical, result.attackRoll === 20);
+});
+
+Deno.test("spendFear mechanics", () => {
+  const gameManager = createTestManager();
+  
+  // Set up some Fear
+  const state = gameManager.getState();
+  state.gm.fear = 5;
+  
+  // Test successful spend
+  const result1 = gameManager.spendFear({
+    amount: 2,
+    purpose: 'damage'
+  });
+  
+  assertEquals(result1.success, true);
+  assertEquals(result1.newTotal, 3);
+  assertEquals(result1.effect, 'damage_bonus');
+  
+  // Test insufficient Fear
+  const result2 = gameManager.spendFear({
+    amount: 5,
+    purpose: 'spotlight'
+  });
+  
+  assertEquals(result2.success, false);
+  assertEquals(result2.effect, 'insufficient_fear');
+});
+
+Deno.test("spendFear for spotlight", () => {
+  const gameManager = createTestManager();
+  
+  // Set up Fear
+  const state = gameManager.getState();
+  state.gm.fear = 3;
+  
+  const result = gameManager.spendFear({
+    amount: 1,
+    purpose: 'spotlight'
+  });
+  
+  assertEquals(result.success, true);
+  assertEquals(result.effect, 'spotlight_kept');
+  assertEquals(result.spotlightToGM, true);
+  
+  // Verify spotlight state
+  const updatedState = gameManager.getState();
+  assertEquals(updatedState.gm.hasSpotlight, true);
 }); 

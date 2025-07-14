@@ -187,10 +187,115 @@ const createDaggerheartTools = (sessionId: string) => {
 
 
 
+  // Phase 2 Tool: Roll damage with weapon dice
+  const rollDamageTool = tool({
+    name: 'roll_damage',
+    description: 'Schaden würfeln mit Waffen-Würfeln × Fertigkeit',
+    parameters: {
+      type: 'object',
+      properties: {
+        weaponDice: { type: 'string' }, // e.g., "1d8+2"
+        proficiency: { type: 'number', minimum: 1 },
+        isCritical: { type: 'boolean' },
+        fearBonus: { type: 'number', minimum: 0 }
+      },
+      required: ['weaponDice', 'proficiency'],
+      additionalProperties: false,
+    },
+    async execute(args: any) {
+      const result = gameManager.rollDamage(args);
+      
+      console.log('rollDamage called with:', args);
+      console.log('rollDamage result:', result);
+      
+      return result;
+    },
+  });
+
+  // Phase 2 Tool: Deal damage to player
+  const dealDamageToPlayerTool = tool({
+    name: 'deal_damage_to_player',
+    description: 'Schaden an Spieler mit Schwellenwert-System',
+    parameters: {
+      type: 'object',
+      properties: {
+        damage: { type: 'number', minimum: 0 },
+        damageType: { type: 'string', enum: ['physical', 'magical'] },
+        canUseArmor: { type: 'boolean' },
+        resistance: { type: 'boolean' },
+        immunity: { type: 'boolean' },
+        direct: { type: 'boolean' }
+      },
+      required: ['damage'],
+      additionalProperties: false,
+    },
+    async execute(args: any) {
+      const result = gameManager.dealDamageToPlayer(args);
+      
+      console.log('dealDamageToPlayer called with:', args);
+      console.log('dealDamageToPlayer result:', result);
+      
+      return result;
+    },
+  });
+
+  // Phase 2 Tool: Make adversary attack
+  const makeAdversaryAttackTool = tool({
+    name: 'make_adversary_attack',
+    description: 'Gegner-Angriff mit d20',
+    parameters: {
+      type: 'object',
+      properties: {
+        attackBonus: { type: 'number' },
+        targetEvasion: { type: 'number' },
+        advantage: { type: 'number', minimum: 0 },
+        disadvantage: { type: 'number', minimum: 0 }
+      },
+      required: ['attackBonus', 'targetEvasion'],
+      additionalProperties: false,
+    },
+    async execute(args: any) {
+      const result = gameManager.makeAdversaryAttack(args);
+      
+      console.log('makeAdversaryAttack called with:', args);
+      console.log('makeAdversaryAttack result:', result);
+      
+      return result;
+    },
+  });
+
+  // Phase 2 Tool: Spend Fear
+  const spendFearTool = tool({
+    name: 'spend_fear',
+    description: 'Furcht ausgeben für Effekte (inkl. Scheinwerfer behalten)',
+    parameters: {
+      type: 'object',
+      properties: {
+        amount: { type: 'number', minimum: 1 },
+        purpose: { type: 'string', enum: ['spotlight', 'damage', 'advantage', 'ability'] },
+        description: { type: 'string' }
+      },
+      required: ['amount', 'purpose'],
+      additionalProperties: false,
+    },
+    async execute(args: any) {
+      const result = gameManager.spendFear(args);
+      
+      console.log('spendFear called with:', args);
+      console.log('spendFear result:', result);
+      
+      return result;
+    },
+  });
+
   return [
     getStateTool,
     updatePlayerTool,
     rollActionTool,
+    rollDamageTool,
+    dealDamageToPlayerTool,
+    makeAdversaryAttackTool,
+    spendFearTool,
     updateSceneTool,
     rollDiceTool,
     manageQuestsTool,

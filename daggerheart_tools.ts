@@ -287,6 +287,216 @@ export class DaggerheartGameManager {
       experienceUsed: args.useExperience || null
     };
   }
+
+  // Phase 2: Combat damage calculation
+  rollDamage(args: any) {
+    const { weaponDice, proficiency, isCritical = false, fearBonus = 0 } = args;
+    
+    // Parse weapon dice (e.g., "1d8+2")
+    const diceMatch = weaponDice.match(/(\d+)d(\d+)(?:\+(\d+))?/);
+    if (!diceMatch) {
+      throw new Error(`Invalid weapon dice format: ${weaponDice}`);
+    }
+    
+    const [, diceCount, diceSides, baseMod] = diceMatch;
+    const count = parseInt(diceCount);
+    const sides = parseInt(diceSides);
+    const baseModifier = parseInt(baseMod || '0');
+    
+    // Roll base weapon dice
+    const rolls = rollDice(sides, count);
+    const baseRoll = rolls.reduce((sum, roll) => sum + roll, 0);
+    
+    // Apply proficiency multiplier to dice (not static modifier)
+    const proficiencyDamage = baseRoll * proficiency;
+    
+    // Add static modifier
+    const withModifier = proficiencyDamage + baseModifier;
+    
+    // Critical hit: add maximum possible damage
+    const maxDamage = isCritical ? (sides * count) : 0;
+    
+    // Fear bonus: +1d4 per Fear spent
+    const fearBonusRolls = fearBonus > 0 ? rollDice(4, fearBonus) : [];
+    const fearBonusTotal = fearBonusRolls.reduce((sum, roll) => sum + roll, 0);
+    
+    const total = withModifier + maxDamage + fearBonusTotal;
+    
+    return {
+      total,
+      rolls,
+      maxDamage,
+      fearBonusRolls,
+      breakdown: `${count}d${sides}×${proficiency}${baseModifier > 0 ? `+${baseModifier}` : baseModifier < 0 ? `${baseModifier}` : ''}${maxDamage > 0 ? `+${maxDamage}(max)` : ''}${fearBonusTotal > 0 ? `+${fearBonusTotal}(fear)` : ''}`
+    };
+  }
+
+  // Phase 2: Apply damage with threshold system
+  dealDamageToPlayer(args: any) {
+    const { 
+      damage, 
+      damageType = 'physical', 
+      canUseArmor = true, 
+      resistance = false, 
+      immunity = false,
+      direct = false 
+    } = args;
+    
+    const state = this.getGameState();
+    let finalDamage = damage;
+    
+    // Handle immunity
+    if (immunity) {
+      return {
+        hpLost: 0,
+        armorUsed: false,
+        damageAfterReduction: 0,
+        newVulnerable: state.player.stress.current === 0,
+        deathCheck: state.player.hp.current === 0,
+        thresholdReached: 'none'
+      };
+    }
+    
+    // Handle resistance (halve damage before thresholds)
+    if (resistance) {
+      finalDamage = Math.floor(finalDamage / 2);
+    }
+    
+    // Check armor usage (can reduce by one threshold level)
+    let armorUsed = false;
+    if (canUseArmor && !direct && state.player.armor.current > 0) {
+      const { major, severe } = state.player.thresholds;
+      
+      // If damage would hit major/severe threshold, can use armor to reduce
+      if (finalDamage >= major) {
+        armorUsed = true;
+        state.player.armor.current -= 1;
+        // Reduce damage by one threshold level
+        if (finalDamage >= severe) {
+          finalDamage = Math.max(finalDamage - (severe - major), major - 1);
+        } else {
+          finalDamage = Math.max(finalDamage - major, 0);
+        }
+      }
+    }
+    
+    // Calculate HP loss based on thresholds
+    const { major, severe } = state.player.thresholds;
+    let hpLost = 1; // Default
+    let thresholdReached = 'minor';
+    
+    if (finalDamage >= severe * 2) {
+      hpLost = 4;
+      thresholdReached = 'massive';
+    } else if (finalDamage >= severe) {
+      hpLost = 3;
+      thresholdReached = 'severe';
+    } else if (finalDamage >= major) {
+      hpLost = 2;
+      thresholdReached = 'major';
+    } else if (finalDamage > 0) {
+      hpLost = 1;
+      thresholdReached = 'minor';
+    } else {
+      hpLost = 0;
+      thresholdReached = 'none';
+    }
+    
+    // Apply HP loss
+    const oldHp = state.player.hp.current;
+    state.player.hp.current = Math.max(0, oldHp - hpLost);
+    
+    // Check for new vulnerable condition (stress = 0)
+    const newVulnerable = state.player.stress.current === 0;
+    
+    // Check for death
+    const deathCheck = state.player.hp.current === 0;
+    
+    this.updateGameState({ player: state.player });
+    
+    return {
+      hpLost,
+      armorUsed,
+      damageAfterReduction: finalDamage,
+      newVulnerable,
+      deathCheck,
+      thresholdReached
+    };
+  }
+
+  // Phase 2: GM attack rolls
+  makeAdversaryAttack(args: any) {
+    const { attackBonus, targetEvasion, advantage = 0, disadvantage = 0 } = args;
+    
+    // Roll d20
+    const baseRoll = rollDice(20, 1)[0];
+    
+    // Apply advantage/disadvantage
+    let modifierRoll = 0;
+    if (advantage > 0 || disadvantage > 0) {
+      const net = advantage - disadvantage;
+      modifierRoll = rollD6Modifier(net);
+    }
+    
+    const total = baseRoll + attackBonus + modifierRoll;
+    const hit = total >= targetEvasion;
+    const isCritical = baseRoll === 20; // Natural 20 always hits
+    
+    return {
+      hit: hit || isCritical,
+      isCritical,
+      attackRoll: baseRoll,
+      total,
+      targetEvasion
+    };
+  }
+
+  // Phase 2: GM Fear spending
+  spendFear(args: any) {
+    const { amount, purpose, description = '' } = args;
+    const state = this.getGameState();
+    
+    // Validate Fear availability
+    if (state.gm.fear < amount) {
+      return {
+        success: false,
+        newTotal: state.gm.fear,
+        effect: 'insufficient_fear'
+      };
+    }
+    
+    // Spend Fear
+    state.gm.fear -= amount;
+    
+    // Apply effect based on purpose
+    let effect = '';
+    switch (purpose) {
+      case 'spotlight':
+        state.gm.hasSpotlight = true;
+        effect = 'spotlight_kept';
+        break;
+      case 'damage':
+        effect = 'damage_bonus';
+        break;
+      case 'advantage':
+        effect = 'advantage_gained';
+        break;
+      case 'ability':
+        effect = 'ability_activated';
+        break;
+      default:
+        effect = purpose || 'unknown';
+    }
+    
+    this.updateGameState(state);
+    
+    return {
+      success: true,
+      newTotal: state.gm.fear,
+      effect,
+      spotlightToGM: purpose === 'spotlight'
+    };
+  }
 }
 
 // Factory function for creating game managers
