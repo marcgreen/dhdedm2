@@ -934,6 +934,26 @@ Starte mit einer freundlichen Begrüßung und frage nach dem Namen des Charakter
                 }
               });
 
+              // Add error handler for RealtimeSession
+              realtimeSession.on('error', (error: any) => {
+                console.error('RealtimeSession error:', error);
+                
+                // Handle specific error types
+                if (error?.error?.code === 'response_cancel_not_active') {
+                  // This is a common non-critical error when trying to cancel a response that's already finished
+                  console.log('Response cancellation attempted on inactive response - this is usually harmless');
+                  return;
+                }
+                
+                // For other errors, send to client
+                if (socket.readyState === WebSocket.OPEN) {
+                  socket.send(JSON.stringify({
+                    type: 'realtime_error',
+                    error: error?.error?.message || 'Unknown realtime error'
+                  }));
+                }
+              });
+
               // Listen for conversation history updates (documented API)
               realtimeSession.on('history_updated', (history: any) => {
                 // console.log('Conversation history updated, sending to client');
@@ -964,10 +984,16 @@ Starte mit einer freundlichen Begrüßung und frage nach dem Namen des Charakter
 
               // Connect to OpenAI using WebSocket transport
               console.log('Connecting to OpenAI Realtime API via WebSocket...');
-              await realtimeSession.connect({
-                apiKey: message.clientApiKey,
-              });
-              console.log('Successfully connected to OpenAI Realtime API via WebSocket');
+              
+              try {
+                await realtimeSession.connect({
+                  apiKey: message.clientApiKey,
+                });
+                console.log('Successfully connected to OpenAI Realtime API via WebSocket');
+              } catch (connectError) {
+                console.error('Failed to connect to OpenAI Realtime API:', connectError);
+                throw connectError;
+              }
 
               if (sessionId) {
                 sessions.set(sessionId, realtimeSession);
@@ -1017,24 +1043,40 @@ Starte mit einer freundlichen Begrüßung und frage nach dem Namen des Charakter
               
               // Send PCM16 audio to OpenAI Realtime API
               if (typeof realtimeSession.sendAudio === 'function') {
-                const result = await realtimeSession.sendAudio(arrayBuffer);
-                
-                // Check session state less frequently for debugging
-                if (Math.random() < 0.001) { // Very rarely log session state
-                  setTimeout(() => {
-                    try {
-                      if (!realtimeSession) return;
-                      
-                      const session = realtimeSession as any;
-                      if (session && session.getState) {
-                        console.log('Session state check:', typeof session.getState());
+                try {
+                  const result = await realtimeSession.sendAudio(arrayBuffer);
+                  
+                  // Check session state less frequently for debugging
+                  if (Math.random() < 0.001) { // Very rarely log session state
+                    setTimeout(() => {
+                      try {
+                        if (!realtimeSession) return;
+                        
+                        const session = realtimeSession as any;
+                        if (session && session.getState) {
+                          console.log('Session state check:', typeof session.getState());
+                        }
+                      } catch (e) {
+                        // Silently ignore session state check errors
                       }
-                    } catch (e) {
-                      // Silently ignore session state check errors
-                    }
-                  }, 100);
+                    }, 100);
+                  }
+                } catch (audioError) {
+                  console.error('Error sending audio to OpenAI:', audioError);
+                  
+                  // Don't send every audio error to client as they can be frequent
+                  // Only send critical errors that might affect the session
+                  const errorObj = audioError as any;
+                  if (errorObj && 
+                      errorObj.error && 
+                      errorObj.error.code && 
+                      errorObj.error.code !== 'response_cancel_not_active') {
+                    socket.send(JSON.stringify({ 
+                      type: 'audio_error', 
+                      error: errorObj.error.message || 'Audio processing error' 
+                    }));
+                  }
                 }
-                
               } else {
                 console.error('sendAudio method not available on RealtimeSession');
                 socket.send(JSON.stringify({ 
@@ -1093,6 +1135,23 @@ Starte mit einer freundlichen Begrüßung und frage nach dem Namen des Charakter
 
     socket.onerror = (error) => {
       console.error("WebSocket error:", error);
+      
+      // Clean up session on WebSocket error
+      if (realtimeSession && sessionId) {
+        try {
+          const session = realtimeSession as any;
+          if (typeof session.close === 'function') {
+            session.close().catch((e: any) => console.error('Error closing session after WebSocket error:', e));
+          } else if (typeof session.disconnect === 'function') {
+            session.disconnect().catch((e: any) => console.error('Error disconnecting session after WebSocket error:', e));
+          }
+        } catch (e) {
+          console.error('Error cleaning up session after WebSocket error:', e);
+        }
+        
+        sessions.delete(sessionId);
+        sockets.delete(sessionId);
+      }
     };
 
     return response;
