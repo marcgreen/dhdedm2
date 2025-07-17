@@ -65,6 +65,8 @@ export default function VoiceChat(_props: VoiceChatProps) {
     conversationHistory: []
   });
 
+  const isPaused = useSignal(false);
+
   // Initialize voice chat when component mounts
   useEffect(() => {
     if (!IS_BROWSER) return;
@@ -392,6 +394,7 @@ export default function VoiceChat(_props: VoiceChatProps) {
       const processor = audioContextRef.current.createScriptProcessor(bufferSize, 1, 1);
       
       processor.onaudioprocess = (event) => {
+        if (isPaused.value) return; // Block audio sending when paused
         if (wsRef.current?.readyState === WebSocket.OPEN) {
           const inputBuffer = event.inputBuffer;
           const inputData = inputBuffer.getChannelData(0);
@@ -789,6 +792,23 @@ export default function VoiceChat(_props: VoiceChatProps) {
     }
   };
 
+  function pauseSession() {
+    if (!isPaused.value) {
+      isPaused.value = true;
+      stopAudioCapture();
+      clearAudioQueue();
+      status.value = "Pausiert – klicke auf Fortsetzen";
+    }
+  }
+
+  function resumeSession() {
+    if (isPaused.value) {
+      isPaused.value = false;
+      startAudioCapture();
+      status.value = "Mit Der Spielleiter verbunden – Sprich jetzt!";
+    }
+  }
+
   return (
     <div class="max-w-6xl mx-auto p-4 space-y-6">
       {/* Main Voice Interface */}
@@ -811,6 +831,24 @@ export default function VoiceChat(_props: VoiceChatProps) {
             {isConnecting.value ? '⏳' : isConnected.value ? '🔴' : '🎙️'}
           </button>
         </div>
+        {isConnected.value && (
+          <div class="flex justify-center gap-4 mt-4">
+            <button
+              class={`px-4 py-2 rounded bg-yellow-500 text-white font-bold ${isPaused.value ? 'opacity-50' : ''}`}
+              onClick={pauseSession}
+              disabled={isPaused.value}
+            >
+              ⏸️ Pause
+            </button>
+            <button
+              class={`px-4 py-2 rounded bg-green-500 text-white font-bold ${!isPaused.value ? 'opacity-50' : ''}`}
+              onClick={resumeSession}
+              disabled={!isPaused.value}
+            >
+              ▶️ Fortsetzen
+            </button>
+          </div>
+        )}
         
         <div class="space-y-2">
           <p class={`text-lg font-semibold ${
