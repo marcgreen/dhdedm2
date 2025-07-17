@@ -17,6 +17,7 @@ const assert = (condition: boolean, message?: string) => {
 // Test constants
 const DEFAULT_HP = 10;
 const DEFAULT_STRESS = 5;
+const DEFAULT_HOPE = 2;
 const MAX_FEAR = 12;
 
 // Helper to create isolated test session
@@ -28,7 +29,7 @@ Deno.test("getState returns default state", () => {
   
   assertEquals(state.player.name, '');
   assertEquals(state.player.hp.current, DEFAULT_HP);
-  assertEquals(state.player.hope, 0);
+  assertEquals(state.player.hope, DEFAULT_HOPE);
   assertEquals(state.gm.fear, 0);
   assertEquals(state.gm.hasSpotlight, false);
 });

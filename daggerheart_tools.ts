@@ -10,8 +10,8 @@ export const createDefaultGameState = () => ({
     name: '',
     level: 1,
     hp: { current: 10, max: 10 },
-    stress: { current: 5, max: 5 },
-    hope: 0,
+    stress: { current: 0, max: 5 },
+    hope: 2,
     armor: { current: 3, max: 3 },
     evasion: 10,
     thresholds: { major: 5, severe: 10 },
@@ -25,7 +25,7 @@ export const createDefaultGameState = () => ({
     inventory: []
   },
   gm: {
-    fear: 0,
+    fear: 2,
     hasSpotlight: false
   },
   scene: {
