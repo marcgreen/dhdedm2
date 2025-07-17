@@ -7,6 +7,14 @@ import { GameState, ToolResult } from "../../../types.ts";
 // Store active sessions
 const sessions = new Map<string, RealtimeSession>();
 const sockets = new Map<string, WebSocket>();
+// Store synthetic tool call logs per session
+const toolCallLogs = new Map<string, any[]>();
+
+// Helper to log a tool call event
+function logToolCall(sessionId: string, event: any) {
+  if (!toolCallLogs.has(sessionId)) toolCallLogs.set(sessionId, []);
+  toolCallLogs.get(sessionId).push(event);
+}
 
 // Helper function to send game state updates
 const sendGameStateUpdate = (sessionId: string, toolResult: ToolResult) => {
@@ -35,8 +43,23 @@ const createDaggerheartTools = (sessionId: string) => {
       additionalProperties: false,
     },
     async execute() {
+      const now = new Date().toLocaleTimeString();
+      logToolCall(sessionId, {
+        type: 'tool_call',
+        name: 'get_state',
+        status: 'started',
+        arguments: {},
+        timestamp: now,
+      });
       const state = gameManager.getState();
-      console.log('getState called, returning:', JSON.stringify(state, null, 2));
+      logToolCall(sessionId, {
+        type: 'tool_call',
+        name: 'get_state',
+        status: 'succeeded',
+        arguments: {},
+        output: state,
+        timestamp: now,
+      });
       return state;
     },
   });
@@ -74,9 +97,15 @@ const createDaggerheartTools = (sessionId: string) => {
       additionalProperties: false,
     },
     async execute(args: any) {
+      const now = new Date().toLocaleTimeString();
+      logToolCall(sessionId, {
+        type: 'tool_call',
+        name: 'update_player',
+        status: 'started',
+        arguments: args,
+        timestamp: now,
+      });
       const result = gameManager.updatePlayer(args);
-      
-      // Send game state update to frontend
       const gameState = gameManager.getState();
       const toolResult: ToolResult = {
         name: 'update_player',
@@ -85,13 +114,16 @@ const createDaggerheartTools = (sessionId: string) => {
         gameState: gameState
       };
       sendGameStateUpdate(sessionId, toolResult);
-      
-      console.log('updatePlayer called with:', args);
-      console.log('updatePlayer changes:', result.changes);
-      console.log('updatePlayer result:', result);
-      
+      logToolCall(sessionId, {
+        type: 'tool_call',
+        name: 'update_player',
+        status: 'succeeded',
+        arguments: args,
+        output: result,
+        timestamp: now,
+      });
       return result;
-    },
+    }
   });
 
   // Phase 1 Tool: Roll action with 2d12 and Hope/Fear mechanics
@@ -116,15 +148,23 @@ const createDaggerheartTools = (sessionId: string) => {
       additionalProperties: false,
     },
     async execute(args: any) {
+      const now = new Date().toLocaleTimeString();
+      logToolCall(sessionId, {
+        type: 'tool_call',
+        name: 'roll_action',
+        status: 'started',
+        arguments: args,
+        timestamp: now,
+      });
       const rollResult = gameManager.rollAction(args);
-      
-      console.log('rollAction called with:', args);
-      console.log('rollAction dice:', { hopeRoll: rollResult.rolls.hope, fearRoll: rollResult.rolls.fear, modifierRoll: rollResult.modifierRoll, total: rollResult.total });
-      console.log('rollAction result:', rollResult);
-      
-      const currentState = gameManager.getState();
-      console.log('rollAction updated state - Hope:', currentState.player.hope, 'Fear:', currentState.gm.fear, 'Spotlight:', currentState.gm.hasSpotlight);
-      
+      logToolCall(sessionId, {
+        type: 'tool_call',
+        name: 'roll_action',
+        status: 'succeeded',
+        arguments: args,
+        output: rollResult,
+        timestamp: now,
+      });
       return rollResult;
     },
   });
@@ -1021,9 +1061,17 @@ Starte mit einer freundlichen Begrüßung und frage nach dem Namen des Charakter
                   }
                 }
                 
-                socket.send(JSON.stringify({
+                // Merge tool call logs for this session
+                const sessionToolCalls = toolCallLogs.get(sessionId) || [];
+                // Merge and sort by timestamp (if timestamps are comparable)
+                const mergedHistory = [...history, ...sessionToolCalls].sort((a, b) => {
+                  const timeA = new Date(`1970-01-01 ${a.timestamp}`).getTime();
+                  const timeB = new Date(`1970-01-01 ${b.timestamp}`).getTime();
+                  return timeA - timeB;
+                });
+                sockets.get(sessionId)?.send(JSON.stringify({
                   type: 'history_updated',
-                  history: history
+                  history: mergedHistory
                 }));
               });
               
