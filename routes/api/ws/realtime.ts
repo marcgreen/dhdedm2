@@ -184,7 +184,24 @@ const createDaggerheartTools = (sessionId: string) => {
       additionalProperties: true,
     },
     async execute(args: any) {
-      return `Scene updated: ${args.scene} - ${args.description}`;
+      const now = new Date().toISOString();
+      logToolCall(sessionId, {
+        type: 'tool_call',
+        name: 'update_scene',
+        status: 'started',
+        arguments: args,
+        timestamp: now,
+      });
+      const result = `Scene updated: ${args.scene} - ${args.description}`;
+      logToolCall(sessionId, {
+        type: 'tool_call',
+        name: 'update_scene',
+        status: 'succeeded',
+        arguments: args,
+        output: result,
+        timestamp: now,
+      });
+      return result;
     },
   });
 
@@ -203,17 +220,32 @@ const createDaggerheartTools = (sessionId: string) => {
       additionalProperties: true,
     },
     async execute(args: any) {
+      const now = new Date().toISOString();
+      logToolCall(sessionId, {
+        type: 'tool_call',
+        name: 'roll_dice',
+        status: 'started',
+        arguments: args,
+        timestamp: now,
+      });
       const rolls: number[] = [];
       const count = args.count || 1;
       const modifier = args.modifier || 0;
-      
       for (let i = 0; i < count; i++) {
         rolls.push(Math.floor(Math.random() * args.sides) + 1);
       }
       const total = rolls.reduce((sum, roll) => sum + roll, 0) + modifier;
-      
       const rollString = `${count}d${args.sides}${modifier > 0 ? `+${modifier}` : modifier < 0 ? `${modifier}` : ''}`;
-      return `Rolled ${rollString}: [${rolls.join(', ')}] = ${total}`;
+      const result = `Rolled ${rollString}: [${rolls.join(', ')}] = ${total}`;
+      logToolCall(sessionId, {
+        type: 'tool_call',
+        name: 'roll_dice',
+        status: 'succeeded',
+        arguments: args,
+        output: result,
+        timestamp: now,
+      });
+      return result;
     },
   });
 
@@ -232,7 +264,24 @@ const createDaggerheartTools = (sessionId: string) => {
       additionalProperties: true,
     },
     async execute(args: any) {
-      return `Quest ${args.action}: ${args.quest}`;
+      const now = new Date().toISOString();
+      logToolCall(sessionId, {
+        type: 'tool_call',
+        name: 'manage_quests',
+        status: 'started',
+        arguments: args,
+        timestamp: now,
+      });
+      const result = `Quest ${args.action}: ${args.quest}`;
+      logToolCall(sessionId, {
+        type: 'tool_call',
+        name: 'manage_quests',
+        status: 'succeeded',
+        arguments: args,
+        output: result,
+        timestamp: now,
+      });
+      return result;
     },
   });
 
@@ -250,7 +299,24 @@ const createDaggerheartTools = (sessionId: string) => {
       additionalProperties: true,
     },
     async execute(args: any) {
-      return `Language progress updated`;
+      const now = new Date().toISOString();
+      logToolCall(sessionId, {
+        type: 'tool_call',
+        name: 'track_language',
+        status: 'started',
+        arguments: args,
+        timestamp: now,
+      });
+      const result = `Language progress updated`;
+      logToolCall(sessionId, {
+        type: 'tool_call',
+        name: 'track_language',
+        status: 'succeeded',
+        arguments: args,
+        output: result,
+        timestamp: now,
+      });
+      return result;
     },
   });
 
@@ -270,21 +336,35 @@ const createDaggerheartTools = (sessionId: string) => {
       additionalProperties: true,
     },
     async execute(args: any) {
+      const now = new Date().toISOString();
+      logToolCall(sessionId, {
+        type: 'tool_call',
+        name: 'update_inventory',
+        status: 'started',
+        arguments: args,
+        timestamp: now,
+      });
+      let result;
       if (args.gold) {
-        return `Gold updated: ${args.gold}`;
-      }
-      if (args.item) {
+        result = `Gold updated: ${args.gold}`;
+      } else if (args.item) {
         const action = args.action || 'add';
         const quantity = args.quantity || 1;
-        return `${action === 'add' ? 'Added' : 'Removed'} ${quantity}x ${args.item}`;
+        result = `${action === 'add' ? 'Added' : 'Removed'} ${quantity}x ${args.item}`;
+      } else {
+        result = `Inventory updated`;
       }
-      return `Inventory updated`;
+      logToolCall(sessionId, {
+        type: 'tool_call',
+        name: 'update_inventory',
+        status: 'succeeded',
+        arguments: args,
+        output: result,
+        timestamp: now,
+      });
+      return result;
     },
   });
-
-
-
-
 
   // Phase 2 Tool: Roll damage with weapon dice
   const rollDamageTool = tool({
@@ -302,11 +382,27 @@ const createDaggerheartTools = (sessionId: string) => {
       additionalProperties: false,
     },
     async execute(args: any) {
+      const now = new Date().toISOString();
+      logToolCall(sessionId, {
+        type: 'tool_call',
+        name: 'roll_damage',
+        status: 'started',
+        arguments: args,
+        timestamp: now,
+      });
       const result = gameManager.rollDamage(args);
       
       console.log('rollDamage called with:', args);
       console.log('rollDamage result:', result);
       
+      logToolCall(sessionId, {
+        type: 'tool_call',
+        name: 'roll_damage',
+        status: 'succeeded',
+        arguments: args,
+        output: result,
+        timestamp: now,
+      });
       return result;
     },
   });
@@ -329,11 +425,27 @@ const createDaggerheartTools = (sessionId: string) => {
       additionalProperties: false,
     },
     async execute(args: any) {
+      const now = new Date().toISOString();
+      logToolCall(sessionId, {
+        type: 'tool_call',
+        name: 'deal_damage_to_player',
+        status: 'started',
+        arguments: args,
+        timestamp: now,
+      });
       const result = gameManager.dealDamageToPlayer(args);
       
       console.log('dealDamageToPlayer called with:', args);
       console.log('dealDamageToPlayer result:', result);
       
+      logToolCall(sessionId, {
+        type: 'tool_call',
+        name: 'deal_damage_to_player',
+        status: 'succeeded',
+        arguments: args,
+        output: result,
+        timestamp: now,
+      });
       return result;
     },
   });
@@ -354,11 +466,27 @@ const createDaggerheartTools = (sessionId: string) => {
       additionalProperties: false,
     },
     async execute(args: any) {
+      const now = new Date().toISOString();
+      logToolCall(sessionId, {
+        type: 'tool_call',
+        name: 'make_adversary_attack',
+        status: 'started',
+        arguments: args,
+        timestamp: now,
+      });
       const result = gameManager.makeAdversaryAttack(args);
       
       console.log('makeAdversaryAttack called with:', args);
       console.log('makeAdversaryAttack result:', result);
       
+      logToolCall(sessionId, {
+        type: 'tool_call',
+        name: 'make_adversary_attack',
+        status: 'succeeded',
+        arguments: args,
+        output: result,
+        timestamp: now,
+      });
       return result;
     },
   });
@@ -378,11 +506,27 @@ const createDaggerheartTools = (sessionId: string) => {
       additionalProperties: false,
     },
     async execute(args: any) {
+      const now = new Date().toISOString();
+      logToolCall(sessionId, {
+        type: 'tool_call',
+        name: 'spend_fear',
+        status: 'started',
+        arguments: args,
+        timestamp: now,
+      });
       const result = gameManager.spendFear(args);
       
       console.log('spendFear called with:', args);
       console.log('spendFear result:', result);
       
+      logToolCall(sessionId, {
+        type: 'tool_call',
+        name: 'spend_fear',
+        status: 'succeeded',
+        arguments: args,
+        output: result,
+        timestamp: now,
+      });
       return result;
     },
   });
