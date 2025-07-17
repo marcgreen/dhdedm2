@@ -401,7 +401,7 @@ export default function VoiceChat(_props: VoiceChatProps) {
           const inputSampleRate = audioContextRef.current!.sampleRate;
           
           // Detect user speech activity (simple volume threshold)
-          const volumeThreshold = 0.01; // Adjust as needed
+          const volumeThreshold = 0.02; // Adjust as needed
           const averageVolume = inputData.reduce((sum, sample) => sum + Math.abs(sample), 0) / inputData.length;
           
           // If user is speaking and AI is playing audio, clear the queue (proactive interruption)
