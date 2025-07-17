@@ -1082,7 +1082,7 @@ export default function VoiceChat(_props: VoiceChatProps) {
                           <span>🛠️ Tool</span>
                           {message.toolName && <span class="ml-1 font-mono text-xs text-gray-400">{message.toolName}</span>}
                         </span>
-                        <span class="text-gray-500 text-xs">{message.timestamp}</span>
+                        <span class="text-gray-500 text-xs">{new Date(message.timestamp).toLocaleTimeString()}</span>
                       </div>
                       <div class="text-gray-200 text-xs font-mono whitespace-pre-wrap break-words">
                         {message.content}
@@ -1103,7 +1103,7 @@ export default function VoiceChat(_props: VoiceChatProps) {
                         }`}>
                           {message.role === 'user' ? 'Du' : 'Der Spielleiter'}
                         </span>
-                        <span class="text-gray-500 text-xs">{message.timestamp}</span>
+                        <span class="text-gray-500 text-xs">{new Date(message.timestamp).toLocaleTimeString()}</span>
                       </div>
                       <div class="text-gray-200 text-sm leading-relaxed">
                         {message.content}

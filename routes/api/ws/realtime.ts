@@ -43,7 +43,7 @@ const createDaggerheartTools = (sessionId: string) => {
       additionalProperties: false,
     },
     async execute() {
-      const now = new Date().toLocaleTimeString();
+      const now = new Date().toISOString();
       logToolCall(sessionId, {
         type: 'tool_call',
         name: 'get_state',
@@ -97,7 +97,7 @@ const createDaggerheartTools = (sessionId: string) => {
       additionalProperties: false,
     },
     async execute(args: any) {
-      const now = new Date().toLocaleTimeString();
+      const now = new Date().toISOString();
       logToolCall(sessionId, {
         type: 'tool_call',
         name: 'update_player',
@@ -148,7 +148,7 @@ const createDaggerheartTools = (sessionId: string) => {
       additionalProperties: false,
     },
     async execute(args: any) {
-      const now = new Date().toLocaleTimeString();
+      const now = new Date().toISOString();
       logToolCall(sessionId, {
         type: 'tool_call',
         name: 'roll_action',
