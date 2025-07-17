@@ -238,6 +238,30 @@ export default function VoiceChat(_props: VoiceChatProps) {
             type: 'message'
           });
         }
+      } else if (item.type === 'tool_call') {
+        // Format tool_call for transcript
+        let content = '';
+        if (item.status === 'started') {
+          content = `${item.name} called with: ${JSON.stringify(item.arguments)}`;
+        } else if (item.status === 'succeeded') {
+          content = `${item.name} result: ${JSON.stringify(item.output)}`;
+        } else if (item.status === 'failed') {
+          content = `${item.name} failed: ${JSON.stringify(item.error)}`;
+        } else {
+          content = `${item.name} tool_call`;
+        }
+        if (item.updatedState) {
+          content += `\n${item.name} updated state: ${JSON.stringify(item.updatedState)}`;
+        }
+        formattedHistory.push({
+          timestamp: item.timestamp || new Date().toLocaleTimeString(),
+          role: 'tool',
+          content,
+          type: 'tool_call',
+          toolName: item.name,
+          toolArguments: item.arguments,
+          toolOutput: item.output,
+        });
       }
     });
     
@@ -1048,25 +1072,46 @@ export default function VoiceChat(_props: VoiceChatProps) {
           </h2>
           <div class="space-y-3 text-sm max-h-64 overflow-y-auto">
             {uiState.value.conversationHistory.length > 0 ? (
-              uiState.value.conversationHistory.slice(-20).map((message, index) => (
-                <div key={index} class={`p-3 rounded-lg ${
-                  message.role === 'user' 
-                    ? 'bg-blue-900 ml-4 border-l-2 border-blue-400' 
-                    : 'bg-purple-900 mr-4 border-l-2 border-purple-400'
-                }`}>
-                  <div class="flex justify-between items-start mb-1">
-                    <span class={`text-xs font-semibold ${
-                      message.role === 'user' ? 'text-blue-300' : 'text-purple-300'
+              uiState.value.conversationHistory.slice(-20).map((message, index) => {
+                if (message.role === 'tool' || message.type === 'tool_call') {
+                  // Tool call entry
+                  return (
+                    <div key={index} class="p-3 rounded-lg bg-gray-800 mx-4 border-l-4 border-gray-400 flex flex-col gap-1">
+                      <div class="flex justify-between items-start mb-1">
+                        <span class="text-xs font-semibold text-gray-300 flex items-center gap-1">
+                          <span>🛠️ Tool</span>
+                          {message.toolName && <span class="ml-1 font-mono text-xs text-gray-400">{message.toolName}</span>}
+                        </span>
+                        <span class="text-gray-500 text-xs">{message.timestamp}</span>
+                      </div>
+                      <div class="text-gray-200 text-xs font-mono whitespace-pre-wrap break-words">
+                        {message.content}
+                      </div>
+                    </div>
+                  );
+                } else {
+                  // User or assistant message
+                  return (
+                    <div key={index} class={`p-3 rounded-lg ${
+                      message.role === 'user' 
+                        ? 'bg-blue-900 ml-4 border-l-2 border-blue-400' 
+                        : 'bg-purple-900 mr-4 border-l-2 border-purple-400'
                     }`}>
-                      {message.role === 'user' ? 'Du' : 'Der Spielleiter'}
-                    </span>
-                    <span class="text-gray-500 text-xs">{message.timestamp}</span>
-                  </div>
-                  <div class="text-gray-200 text-sm leading-relaxed">
-                    {message.content}
-                  </div>
-                </div>
-              ))
+                      <div class="flex justify-between items-start mb-1">
+                        <span class={`text-xs font-semibold ${
+                          message.role === 'user' ? 'text-blue-300' : 'text-purple-300'
+                        }`}>
+                          {message.role === 'user' ? 'Du' : 'Der Spielleiter'}
+                        </span>
+                        <span class="text-gray-500 text-xs">{message.timestamp}</span>
+                      </div>
+                      <div class="text-gray-200 text-sm leading-relaxed">
+                        {message.content}
+                      </div>
+                    </div>
+                  );
+                }
+              })
             ) : (
               <div class="text-gray-500 italic">Noch keine Unterhaltung...</div>
             )}

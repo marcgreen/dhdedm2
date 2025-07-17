@@ -53,9 +53,12 @@ export interface GameState {
 
 export interface ConversationItem {
   timestamp: string;
-  role: 'user' | 'assistant';
+  role: 'user' | 'assistant' | 'tool';
   content: string;
-  type: 'message' | 'audio';
+  type: 'message' | 'audio' | 'tool_call';
+  toolName?: string;
+  toolArguments?: any;
+  toolOutput?: any;
 }
 
 // Tool result types
