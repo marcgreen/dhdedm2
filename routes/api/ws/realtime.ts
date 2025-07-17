@@ -42,25 +42,25 @@ const createDaggerheartTools = (sessionId: string) => {
       required: [],
       additionalProperties: false,
     },
-    async execute() {
+    async execute(args: any = {}) {
       const now = new Date().toISOString();
+      let output, error = null;
+      try {
+        output = gameManager.getState();
+      } catch (err) {
+        error = err instanceof Error ? err.message : String(err);
+      }
       logToolCall(sessionId, {
         type: 'tool_call',
         name: 'get_state',
-        status: 'started',
-        arguments: {},
+        status: error ? 'failed' : 'succeeded',
+        arguments: args,
+        output: error ? undefined : output,
+        error: error || undefined,
         timestamp: now,
       });
-      const state = gameManager.getState();
-      logToolCall(sessionId, {
-        type: 'tool_call',
-        name: 'get_state',
-        status: 'succeeded',
-        arguments: {},
-        output: state,
-        timestamp: now,
-      });
-      return state;
+      if (error) throw error;
+      return output;
     },
   });
 
@@ -98,31 +98,31 @@ const createDaggerheartTools = (sessionId: string) => {
     },
     async execute(args: any) {
       const now = new Date().toISOString();
+      let output, error = null;
+      try {
+        output = gameManager.updatePlayer(args);
+        const gameState = gameManager.getState();
+        const toolResult: ToolResult = {
+          name: 'update_player',
+          parameters: args,
+          output: output,
+          gameState: gameState
+        };
+        sendGameStateUpdate(sessionId, toolResult);
+      } catch (err) {
+        error = err instanceof Error ? err.message : String(err);
+      }
       logToolCall(sessionId, {
         type: 'tool_call',
         name: 'update_player',
-        status: 'started',
+        status: error ? 'failed' : 'succeeded',
         arguments: args,
+        output: error ? undefined : output,
+        error: error || undefined,
         timestamp: now,
       });
-      const result = gameManager.updatePlayer(args);
-      const gameState = gameManager.getState();
-      const toolResult: ToolResult = {
-        name: 'update_player',
-        parameters: args,
-        output: result,
-        gameState: gameState
-      };
-      sendGameStateUpdate(sessionId, toolResult);
-      logToolCall(sessionId, {
-        type: 'tool_call',
-        name: 'update_player',
-        status: 'succeeded',
-        arguments: args,
-        output: result,
-        timestamp: now,
-      });
-      return result;
+      if (error) throw error;
+      return output;
     }
   });
 
@@ -149,23 +149,23 @@ const createDaggerheartTools = (sessionId: string) => {
     },
     async execute(args: any) {
       const now = new Date().toISOString();
+      let output, error = null;
+      try {
+        output = gameManager.rollAction(args);
+      } catch (err) {
+        error = err instanceof Error ? err.message : String(err);
+      }
       logToolCall(sessionId, {
         type: 'tool_call',
         name: 'roll_action',
-        status: 'started',
+        status: error ? 'failed' : 'succeeded',
         arguments: args,
+        output: error ? undefined : output,
+        error: error || undefined,
         timestamp: now,
       });
-      const rollResult = gameManager.rollAction(args);
-      logToolCall(sessionId, {
-        type: 'tool_call',
-        name: 'roll_action',
-        status: 'succeeded',
-        arguments: args,
-        output: rollResult,
-        timestamp: now,
-      });
-      return rollResult;
+      if (error) throw error;
+      return output;
     },
   });
 
@@ -185,23 +185,23 @@ const createDaggerheartTools = (sessionId: string) => {
     },
     async execute(args: any) {
       const now = new Date().toISOString();
+      let output, error = null;
+      try {
+        output = `Scene updated: ${args.scene} - ${args.description}`;
+      } catch (err) {
+        error = err instanceof Error ? err.message : String(err);
+      }
       logToolCall(sessionId, {
         type: 'tool_call',
         name: 'update_scene',
-        status: 'started',
+        status: error ? 'failed' : 'succeeded',
         arguments: args,
+        output: error ? undefined : output,
+        error: error || undefined,
         timestamp: now,
       });
-      const result = `Scene updated: ${args.scene} - ${args.description}`;
-      logToolCall(sessionId, {
-        type: 'tool_call',
-        name: 'update_scene',
-        status: 'succeeded',
-        arguments: args,
-        output: result,
-        timestamp: now,
-      });
-      return result;
+      if (error) throw error;
+      return output;
     },
   });
 
@@ -221,31 +221,31 @@ const createDaggerheartTools = (sessionId: string) => {
     },
     async execute(args: any) {
       const now = new Date().toISOString();
-      logToolCall(sessionId, {
-        type: 'tool_call',
-        name: 'roll_dice',
-        status: 'started',
-        arguments: args,
-        timestamp: now,
-      });
-      const rolls: number[] = [];
-      const count = args.count || 1;
-      const modifier = args.modifier || 0;
-      for (let i = 0; i < count; i++) {
-        rolls.push(Math.floor(Math.random() * args.sides) + 1);
+      let output, error = null;
+      try {
+        const rolls: number[] = [];
+        const count = args.count || 1;
+        const modifier = args.modifier || 0;
+        for (let i = 0; i < count; i++) {
+          rolls.push(Math.floor(Math.random() * args.sides) + 1);
+        }
+        const total = rolls.reduce((sum, roll) => sum + roll, 0) + modifier;
+        const rollString = `${count}d${args.sides}${modifier > 0 ? `+${modifier}` : modifier < 0 ? `${modifier}` : ''}`;
+        output = `Rolled ${rollString}: [${rolls.join(', ')}] = ${total}`;
+      } catch (err) {
+        error = err instanceof Error ? err.message : String(err);
       }
-      const total = rolls.reduce((sum, roll) => sum + roll, 0) + modifier;
-      const rollString = `${count}d${args.sides}${modifier > 0 ? `+${modifier}` : modifier < 0 ? `${modifier}` : ''}`;
-      const result = `Rolled ${rollString}: [${rolls.join(', ')}] = ${total}`;
       logToolCall(sessionId, {
         type: 'tool_call',
         name: 'roll_dice',
-        status: 'succeeded',
+        status: error ? 'failed' : 'succeeded',
         arguments: args,
-        output: result,
+        output: error ? undefined : output,
+        error: error || undefined,
         timestamp: now,
       });
-      return result;
+      if (error) throw error;
+      return output;
     },
   });
 
@@ -265,23 +265,23 @@ const createDaggerheartTools = (sessionId: string) => {
     },
     async execute(args: any) {
       const now = new Date().toISOString();
+      let output, error = null;
+      try {
+        output = `Quest ${args.action}: ${args.quest}`;
+      } catch (err) {
+        error = err instanceof Error ? err.message : String(err);
+      }
       logToolCall(sessionId, {
         type: 'tool_call',
         name: 'manage_quests',
-        status: 'started',
+        status: error ? 'failed' : 'succeeded',
         arguments: args,
+        output: error ? undefined : output,
+        error: error || undefined,
         timestamp: now,
       });
-      const result = `Quest ${args.action}: ${args.quest}`;
-      logToolCall(sessionId, {
-        type: 'tool_call',
-        name: 'manage_quests',
-        status: 'succeeded',
-        arguments: args,
-        output: result,
-        timestamp: now,
-      });
-      return result;
+      if (error) throw error;
+      return output;
     },
   });
 
@@ -300,23 +300,23 @@ const createDaggerheartTools = (sessionId: string) => {
     },
     async execute(args: any) {
       const now = new Date().toISOString();
+      let output, error = null;
+      try {
+        output = `Language progress updated`;
+      } catch (err) {
+        error = err instanceof Error ? err.message : String(err);
+      }
       logToolCall(sessionId, {
         type: 'tool_call',
         name: 'track_language',
-        status: 'started',
+        status: error ? 'failed' : 'succeeded',
         arguments: args,
+        output: error ? undefined : output,
+        error: error || undefined,
         timestamp: now,
       });
-      const result = `Language progress updated`;
-      logToolCall(sessionId, {
-        type: 'tool_call',
-        name: 'track_language',
-        status: 'succeeded',
-        arguments: args,
-        output: result,
-        timestamp: now,
-      });
-      return result;
+      if (error) throw error;
+      return output;
     },
   });
 
@@ -337,32 +337,31 @@ const createDaggerheartTools = (sessionId: string) => {
     },
     async execute(args: any) {
       const now = new Date().toISOString();
-      logToolCall(sessionId, {
-        type: 'tool_call',
-        name: 'update_inventory',
-        status: 'started',
-        arguments: args,
-        timestamp: now,
-      });
-      let result;
-      if (args.gold) {
-        result = `Gold updated: ${args.gold}`;
-      } else if (args.item) {
-        const action = args.action || 'add';
-        const quantity = args.quantity || 1;
-        result = `${action === 'add' ? 'Added' : 'Removed'} ${quantity}x ${args.item}`;
-      } else {
-        result = `Inventory updated`;
+      let output, error = null;
+      try {
+        if (args.gold) {
+          output = `Gold updated: ${args.gold}`;
+        } else if (args.item) {
+          const action = args.action || 'add';
+          const quantity = args.quantity || 1;
+          output = `${action === 'add' ? 'Added' : 'Removed'} ${quantity}x ${args.item}`;
+        } else {
+          output = `Inventory updated`;
+        }
+      } catch (err) {
+        error = err instanceof Error ? err.message : String(err);
       }
       logToolCall(sessionId, {
         type: 'tool_call',
         name: 'update_inventory',
-        status: 'succeeded',
+        status: error ? 'failed' : 'succeeded',
         arguments: args,
-        output: result,
+        output: error ? undefined : output,
+        error: error || undefined,
         timestamp: now,
       });
-      return result;
+      if (error) throw error;
+      return output;
     },
   });
 
@@ -383,27 +382,23 @@ const createDaggerheartTools = (sessionId: string) => {
     },
     async execute(args: any) {
       const now = new Date().toISOString();
+      let output, error = null;
+      try {
+        output = gameManager.rollDamage(args);
+      } catch (err) {
+        error = err instanceof Error ? err.message : String(err);
+      }
       logToolCall(sessionId, {
         type: 'tool_call',
         name: 'roll_damage',
-        status: 'started',
+        status: error ? 'failed' : 'succeeded',
         arguments: args,
+        output: error ? undefined : output,
+        error: error || undefined,
         timestamp: now,
       });
-      const result = gameManager.rollDamage(args);
-      
-      console.log('rollDamage called with:', args);
-      console.log('rollDamage result:', result);
-      
-      logToolCall(sessionId, {
-        type: 'tool_call',
-        name: 'roll_damage',
-        status: 'succeeded',
-        arguments: args,
-        output: result,
-        timestamp: now,
-      });
-      return result;
+      if (error) throw error;
+      return output;
     },
   });
 
@@ -426,27 +421,23 @@ const createDaggerheartTools = (sessionId: string) => {
     },
     async execute(args: any) {
       const now = new Date().toISOString();
+      let output, error = null;
+      try {
+        output = gameManager.dealDamageToPlayer(args);
+      } catch (err) {
+        error = err instanceof Error ? err.message : String(err);
+      }
       logToolCall(sessionId, {
         type: 'tool_call',
         name: 'deal_damage_to_player',
-        status: 'started',
+        status: error ? 'failed' : 'succeeded',
         arguments: args,
+        output: error ? undefined : output,
+        error: error || undefined,
         timestamp: now,
       });
-      const result = gameManager.dealDamageToPlayer(args);
-      
-      console.log('dealDamageToPlayer called with:', args);
-      console.log('dealDamageToPlayer result:', result);
-      
-      logToolCall(sessionId, {
-        type: 'tool_call',
-        name: 'deal_damage_to_player',
-        status: 'succeeded',
-        arguments: args,
-        output: result,
-        timestamp: now,
-      });
-      return result;
+      if (error) throw error;
+      return output;
     },
   });
 
@@ -467,27 +458,23 @@ const createDaggerheartTools = (sessionId: string) => {
     },
     async execute(args: any) {
       const now = new Date().toISOString();
+      let output, error = null;
+      try {
+        output = gameManager.makeAdversaryAttack(args);
+      } catch (err) {
+        error = err instanceof Error ? err.message : String(err);
+      }
       logToolCall(sessionId, {
         type: 'tool_call',
         name: 'make_adversary_attack',
-        status: 'started',
+        status: error ? 'failed' : 'succeeded',
         arguments: args,
+        output: error ? undefined : output,
+        error: error || undefined,
         timestamp: now,
       });
-      const result = gameManager.makeAdversaryAttack(args);
-      
-      console.log('makeAdversaryAttack called with:', args);
-      console.log('makeAdversaryAttack result:', result);
-      
-      logToolCall(sessionId, {
-        type: 'tool_call',
-        name: 'make_adversary_attack',
-        status: 'succeeded',
-        arguments: args,
-        output: result,
-        timestamp: now,
-      });
-      return result;
+      if (error) throw error;
+      return output;
     },
   });
 
@@ -507,27 +494,23 @@ const createDaggerheartTools = (sessionId: string) => {
     },
     async execute(args: any) {
       const now = new Date().toISOString();
+      let output, error = null;
+      try {
+        output = gameManager.spendFear(args);
+      } catch (err) {
+        error = err instanceof Error ? err.message : String(err);
+      }
       logToolCall(sessionId, {
         type: 'tool_call',
         name: 'spend_fear',
-        status: 'started',
+        status: error ? 'failed' : 'succeeded',
         arguments: args,
+        output: error ? undefined : output,
+        error: error || undefined,
         timestamp: now,
       });
-      const result = gameManager.spendFear(args);
-      
-      console.log('spendFear called with:', args);
-      console.log('spendFear result:', result);
-      
-      logToolCall(sessionId, {
-        type: 'tool_call',
-        name: 'spend_fear',
-        status: 'succeeded',
-        arguments: args,
-        output: result,
-        timestamp: now,
-      });
-      return result;
+      if (error) throw error;
+      return output;
     },
   });
 
