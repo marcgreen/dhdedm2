@@ -879,7 +879,7 @@ ${daggerheartRules}
 - Reaktionswürfe: Keine Hoffnung/Furcht-Generierung
 - **WICHTIG**: Spieler verwenden IMMER 2d12, GM verwendet d20 für Angriffe!
 
-Starte mit einer freundlichen Begrüßung und frage nach dem Namen des Charakters. Nutze dann die Tools für die Charaktererstellung!`,
+Starte mit einer freundlichen Begrüßung und frage nach dem Namen des Charakters. Nutze dann die Tools für die Charaktererstellung, und beschreibe die erste Szene--lass uns direkt in die cinematische Szene einsteigen!`,
                 tools: tools,
               });
 
