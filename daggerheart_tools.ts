@@ -17,7 +17,21 @@ export const createDefaultGameState = () => ({
     thresholds: { major: 7, severe: 13 },
     proficiency: 1,
     conditions: [],
-    experiences: [],
+    experiences: ['Springloaded Legs', 'Silent Steps'],
+    domain_cards: [
+      {
+        name: 'Deft Deceiver',
+        type: 'graceability',
+        level: 1,
+        description: 'Spend a Hope to gain advantage on a roll to deceive or trick someone into believing a lie you tell them.'
+      },
+      {
+        name: 'Pick and Pull',
+        type: 'midnightability',
+        level: 1,
+        description: 'You have advantage on action rolls to pick non-magical locks, disarm mechanical traps, or steal items from a target (things like bags, pouches, or containers carried or worn by someone within Melee range).'
+      }
+    ],
     class: 'Rogue',
     background: '',
     currentLocation: 'Starting Area',
@@ -345,7 +359,8 @@ export class DaggerheartGameManager {
         features: state.player.features,
         equipment: state.player.equipment,
         inventory: state.player.inventory,
-        gold: state.player.gold
+        gold: state.player.gold,
+        domain_cards: state.player.domain_cards
       }
     };
   }
@@ -462,6 +477,49 @@ export class DaggerheartGameManager {
       success: true,
       changes,
       equipment: state.player.equipment
+    };
+  }
+
+  // Domain card management methods
+  updateDomainCards(args: any) {
+    const state = this.getGameState();
+    const changes: string[] = [];
+    
+    // Use a domain card (unlimited use)
+    if (args.useDomainCard) {
+      const card = state.player.domain_cards.find((c: any) => c.name === args.useDomainCard);
+      if (card) {
+        changes.push(`used domain card: ${args.useDomainCard}`);
+      }
+    }
+    
+    // Add a new domain card
+    if (args.addDomainCard) {
+      const newCard = {
+        name: args.addDomainCard.name,
+        type: args.addDomainCard.type,
+        level: args.addDomainCard.level || 1,
+        description: args.addDomainCard.description
+      };
+      state.player.domain_cards.push(newCard);
+      changes.push(`added domain card: ${newCard.name}`);
+    }
+    
+    // Remove a domain card
+    if (args.removeDomainCard) {
+      const index = state.player.domain_cards.findIndex((c: any) => c.name === args.removeDomainCard);
+      if (index > -1) {
+        const removedCard = state.player.domain_cards.splice(index, 1)[0];
+        changes.push(`removed domain card: ${removedCard.name}`);
+      }
+    }
+    
+    this.updateGameState({ player: state.player });
+    
+    return {
+      success: true,
+      changes,
+      domain_cards: state.player.domain_cards
     };
   }
 

@@ -562,4 +562,47 @@ Deno.test("Equipment management", () => {
   assertEquals(state.player.thresholds.minor, 6);
   assertEquals(state.player.thresholds.major, 12);
   assertEquals(state.player.armor.max, 3);
+});
+
+Deno.test("Domain cards are properly initialized", () => {
+  const gameManager = createGameManager("test-domain-cards");
+  const state = gameManager.getState();
+  
+  // Check that domain cards are initialized
+  assertEquals(state.player.domain_cards.length, 2);
+  assertEquals(state.player.domain_cards[0].name, "Deft Deceiver");
+  assertEquals(state.player.domain_cards[0].type, "graceability");
+  assertEquals(state.player.domain_cards[0].level, 1);
+  assertEquals(state.player.domain_cards[1].name, "Pick and Pull");
+  assertEquals(state.player.domain_cards[1].type, "midnightability");
+  assertEquals(state.player.domain_cards[1].level, 1);
+});
+
+Deno.test("Domain card management", () => {
+  const gameManager = createGameManager("test-domain-management");
+  
+  // Test using a domain card (unlimited use)
+  let result = gameManager.updateDomainCards({ useDomainCard: "Deft Deceiver" });
+  assert(result.success);
+  assert(result.changes.includes("used domain card: Deft Deceiver"));
+  
+  // Test that cards can be used multiple times
+  result = gameManager.updateDomainCards({ useDomainCard: "Deft Deceiver" });
+  assert(result.success);
+  assert(result.changes.includes("used domain card: Deft Deceiver"));
+  
+  // Test adding a new domain card
+  result = gameManager.updateDomainCards({ 
+    addDomainCard: {
+      name: "Test Card",
+      type: "graceability",
+      level: 1,
+      description: "Test description"
+    }
+  });
+  assert(result.success);
+  assert(result.changes.includes("added domain card: Test Card"));
+  
+  const state = gameManager.getState();
+  assertEquals(state.player.domain_cards.length, 3);
 }); 

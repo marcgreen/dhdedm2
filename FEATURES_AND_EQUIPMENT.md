@@ -6,6 +6,22 @@ This document describes the special features and equipment tracking system imple
 
 The system now tracks special character features that can come from class, background, or other sources. Features can be activated/deactivated and some have level-based progression.
 
+## Domain Cards
+
+Domain cards are special abilities that represent the character's connection to different domains of power. They can be used unlimited times as the player desires.
+
+### Starting Domain Cards
+
+#### Deft Deceiver (graceability Level 1)
+- **Description**: Spend a Hope to gain advantage on a roll to deceive or trick someone into believing a lie you tell them.
+- **Type**: graceability
+- **Level**: 1
+
+#### Pick and Pull (midnightability Level 1)
+- **Description**: You have advantage on action rolls to pick non-magical locks, disarm mechanical traps, or steal items from a target (things like bags, pouches, or containers carried or worn by someone within Melee range).
+- **Type**: midnightability
+- **Level**: 1
+
 ### Hardcoded Starting Features
 
 #### Cloaked
@@ -76,6 +92,13 @@ The system tracks weapons, armor, and inventory items with their properties and 
 - `unequipArmor`: Unequip armor
 - `updateArmorThresholds`: Update armor thresholds based on equipped armor
 
+### Domain Card Management
+
+#### `updateDomainCards(args)`
+- `useDomainCard`: Use a specific domain card (unlimited use)
+- `addDomainCard`: Add a new domain card
+- `removeDomainCard`: Remove a domain card
+
 ### Inventory Management
 
 #### `updateInventory(args)`
@@ -104,7 +127,8 @@ The following new tools are available via WebSocket:
 1. **`update_features`** - Manage character features
 2. **`update_equipment`** - Manage equipment
 3. **`update_inventory`** - Enhanced inventory management (merged functionality)
-4. **`roll_damage`** - Updated to include Sneak Attack parameters
+4. **`update_domain_cards`** - Manage domain cards
+5. **`roll_damage`** - Updated to include Sneak Attack parameters
 
 ## Usage Examples
 
@@ -138,6 +162,15 @@ The following new tools are available via WebSocket:
   "updateArmorThresholds": true
 }
 ```
+
+### Using a Domain Card
+```javascript
+{
+  "useDomainCard": "Deft Deceiver"
+}
+```
+
+
 
 ## Level Progression
 

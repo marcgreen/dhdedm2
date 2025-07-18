@@ -636,7 +636,57 @@ const createDaggerheartTools = (sessionId: string) => {
     },
   });
 
-
+  // Domain card management tool
+  const updateDomainCardsTool = tool({
+    name: 'update_domain_cards',
+    description: 'Manage domain cards (use, add, remove)',
+    parameters: {
+      type: 'object',
+      properties: {
+        useDomainCard: { type: 'string' },
+        addDomainCard: { 
+          type: 'object', 
+          properties: {
+            name: { type: 'string' },
+            type: { type: 'string' },
+            level: { type: 'number' },
+            description: { type: 'string' }
+          }
+        },
+        removeDomainCard: { type: 'string' }
+      },
+      required: [],
+      additionalProperties: false,
+    },
+    async execute(args: any) {
+      const now = new Date().toISOString();
+      let output, error = null;
+      try {
+        output = gameManager.updateDomainCards(args);
+        const gameState = gameManager.getState();
+        const toolResult: ToolResult = {
+          name: 'update_domain_cards',
+          parameters: args,
+          output: output,
+          gameState: gameState
+        };
+        sendGameStateUpdate(sessionId, toolResult);
+      } catch (err) {
+        error = err instanceof Error ? err.message : String(err);
+      }
+      logToolCall(sessionId, {
+        type: 'tool_call',
+        name: 'update_domain_cards',
+        status: error ? 'failed' : 'succeeded',
+        arguments: args,
+        output: error ? undefined : output,
+        error: error || undefined,
+        timestamp: now,
+      });
+      if (error) throw error;
+      return output;
+    },
+  });
 
   return [
     getStateTool,
@@ -653,6 +703,7 @@ const createDaggerheartTools = (sessionId: string) => {
     updateInventoryTool,
     updateFeaturesTool,
     updateEquipmentTool,
+    updateDomainCardsTool,
   ];
 };
 
