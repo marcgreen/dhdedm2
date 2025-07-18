@@ -10,6 +10,11 @@ const sockets = new Map<string, WebSocket>();
 // Store synthetic tool call logs per session
 const toolCallLogs = new Map<string, any[]>();
 
+// Helper to get consistent time-only timestamp
+function getTimeOnlyTimestamp(): string {
+  return new Date().toLocaleTimeString();
+}
+
 // Helper to log a tool call event
 function logToolCall(sessionId: string, event: any) {
   if (!toolCallLogs.has(sessionId)) toolCallLogs.set(sessionId, []);
@@ -44,7 +49,7 @@ const createDaggerheartTools = (sessionId: string) => {
       additionalProperties: false,
     },
     async execute(args: any = {}) {
-      const now = new Date().toISOString();
+      const now = getTimeOnlyTimestamp();
       let output, error = null;
       try {
         output = gameManager.getState();
@@ -98,7 +103,7 @@ const createDaggerheartTools = (sessionId: string) => {
       additionalProperties: false,
     },
     async execute(args: any) {
-      const now = new Date().toISOString();
+      const now = getTimeOnlyTimestamp();
       let output, error = null;
       try {
         output = gameManager.updatePlayer(args);
@@ -149,7 +154,7 @@ const createDaggerheartTools = (sessionId: string) => {
       additionalProperties: false,
     },
     async execute(args: any) {
-      const now = new Date().toISOString();
+      const now = getTimeOnlyTimestamp();
       let output, error = null;
       try {
         output = gameManager.rollAction(args);
@@ -185,7 +190,7 @@ const createDaggerheartTools = (sessionId: string) => {
       additionalProperties: true,
     },
     async execute(args: any) {
-      const now = new Date().toISOString();
+      const now = getTimeOnlyTimestamp();
       let output, error = null;
       try {
         output = `Scene updated: ${args.scene} - ${args.description}`;
@@ -221,7 +226,7 @@ const createDaggerheartTools = (sessionId: string) => {
       additionalProperties: true,
     },
     async execute(args: any) {
-      const now = new Date().toISOString();
+      const now = getTimeOnlyTimestamp();
       let output, error = null;
       try {
         const rolls: number[] = [];
@@ -265,7 +270,7 @@ const createDaggerheartTools = (sessionId: string) => {
       additionalProperties: true,
     },
     async execute(args: any) {
-      const now = new Date().toISOString();
+      const now = getTimeOnlyTimestamp();
       let output, error = null;
       try {
         output = `Quest ${args.action}: ${args.quest}`;
@@ -300,7 +305,7 @@ const createDaggerheartTools = (sessionId: string) => {
       additionalProperties: true,
     },
     async execute(args: any) {
-      const now = new Date().toISOString();
+      const now = getTimeOnlyTimestamp();
       let output, error = null;
       try {
         output = `Language progress updated`;
@@ -351,7 +356,7 @@ const createDaggerheartTools = (sessionId: string) => {
       additionalProperties: false,
     },
     async execute(args: any) {
-      const now = new Date().toISOString();
+      const now = getTimeOnlyTimestamp();
       let output, error = null;
       try {
         // Handle legacy format
@@ -414,7 +419,7 @@ const createDaggerheartTools = (sessionId: string) => {
       additionalProperties: false,
     },
     async execute(args: any) {
-      const now = new Date().toISOString();
+      const now = getTimeOnlyTimestamp();
       let output, error = null;
       try {
         output = gameManager.rollDamage(args);
@@ -453,7 +458,7 @@ const createDaggerheartTools = (sessionId: string) => {
       additionalProperties: false,
     },
     async execute(args: any) {
-      const now = new Date().toISOString();
+      const now = getTimeOnlyTimestamp();
       let output, error = null;
       try {
         output = gameManager.dealDamageToPlayer(args);
@@ -490,7 +495,7 @@ const createDaggerheartTools = (sessionId: string) => {
       additionalProperties: false,
     },
     async execute(args: any) {
-      const now = new Date().toISOString();
+      const now = getTimeOnlyTimestamp();
       let output, error = null;
       try {
         output = gameManager.makeAdversaryAttack(args);
@@ -526,7 +531,7 @@ const createDaggerheartTools = (sessionId: string) => {
       additionalProperties: false,
     },
     async execute(args: any) {
-      const now = new Date().toISOString();
+      const now = getTimeOnlyTimestamp();
       let output, error = null;
       try {
         output = gameManager.spendFear(args);
@@ -562,7 +567,7 @@ const createDaggerheartTools = (sessionId: string) => {
       additionalProperties: false,
     },
     async execute(args: any) {
-      const now = new Date().toISOString();
+      const now = getTimeOnlyTimestamp();
       let output, error = null;
       try {
         output = gameManager.updateFeatures(args);
@@ -608,7 +613,7 @@ const createDaggerheartTools = (sessionId: string) => {
       additionalProperties: false,
     },
     async execute(args: any) {
-      const now = new Date().toISOString();
+      const now = getTimeOnlyTimestamp();
       let output, error = null;
       try {
         output = gameManager.updateEquipment(args);
@@ -660,7 +665,7 @@ const createDaggerheartTools = (sessionId: string) => {
       additionalProperties: false,
     },
     async execute(args: any) {
-      const now = new Date().toISOString();
+      const now = getTimeOnlyTimestamp();
       let output, error = null;
       try {
         output = gameManager.updateDomainCards(args);
@@ -718,7 +723,7 @@ const createDaggerheartTools = (sessionId: string) => {
       additionalProperties: false,
     },
     async execute(args: any) {
-      const now = new Date().toISOString();
+      const now = getTimeOnlyTimestamp();
       let output, error = null;
       try {
         output = gameManager.updateAttributes(args);
@@ -761,7 +766,7 @@ const createDaggerheartTools = (sessionId: string) => {
       additionalProperties: false,
     },
     async execute(args: any) {
-      const now = new Date().toISOString();
+      const now = getTimeOnlyTimestamp();
       let output, error = null;
       try {
         output = gameManager.rest(args);
@@ -1645,10 +1650,31 @@ ${sceneGuide}`;
                 
                 // Merge tool call logs for this session
                 const sessionToolCalls = toolCallLogs.get(sessionId!) || [];
-                // Merge and sort by timestamp (if timestamps are comparable)
+                
+                // Helper function to convert time string to comparable value
+                const getTimeValue = (timestamp: string) => {
+                  // If timestamp is already a time string (HH:MM:SS AM/PM), convert to comparable format
+                  if (timestamp.includes(':') && (timestamp.includes('AM') || timestamp.includes('PM'))) {
+                    const timeStr = timestamp.replace(/\s*(AM|PM)/i, '');
+                    const [hours, minutes, seconds] = timeStr.split(':').map(Number);
+                    const isPM = /PM/i.test(timestamp);
+                    const hour24 = isPM && hours !== 12 ? hours + 12 : (hours === 12 && !isPM ? 0 : hours);
+                    return hour24 * 3600 + minutes * 60 + (seconds || 0);
+                  }
+                  // If it's a full date string, extract just the time part
+                  try {
+                    const date = new Date(timestamp);
+                    return date.getHours() * 3600 + date.getMinutes() * 60 + date.getSeconds();
+                  } catch {
+                    // Fallback: try to parse as time string
+                    return 0;
+                  }
+                };
+                
+                // Merge and sort by timestamp
                 const mergedHistory = [...history, ...sessionToolCalls].sort((a, b) => {
-                  const timeA = new Date(`1970-01-01 ${a.timestamp}`).getTime();
-                  const timeB = new Date(`1970-01-01 ${b.timestamp}`).getTime();
+                  const timeA = getTimeValue(a.timestamp);
+                  const timeB = getTimeValue(b.timestamp);
                   return timeA - timeB;
                 });
                 sockets.get(sessionId!)?.send(JSON.stringify({

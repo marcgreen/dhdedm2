@@ -107,9 +107,25 @@ export default function VoiceChat(_props: VoiceChatProps) {
     
     // Sort by timestamp to ensure chronological order
     allMessages.sort((a, b) => {
-      // Convert timestamps to comparable format for sorting
-      const timeA = new Date(`1970-01-01 ${a.timestamp}`).getTime();
-      const timeB = new Date(`1970-01-01 ${b.timestamp}`).getTime();
+      // Helper function to convert timestamp to comparable time value
+      const getTimeValue = (timestamp: string) => {
+        // If timestamp is already a time string (HH:MM:SS), convert to comparable format
+        if (timestamp.includes(':') && !timestamp.includes('-')) {
+          const [hours, minutes, seconds] = timestamp.split(':').map(Number);
+          return hours * 3600 + minutes * 60 + (seconds || 0);
+        }
+        // If it's a full date string, extract just the time part
+        try {
+          const date = new Date(timestamp);
+          return date.getHours() * 3600 + date.getMinutes() * 60 + date.getSeconds();
+        } catch {
+          // Fallback: try to parse as time string
+          return 0;
+        }
+      };
+      
+      const timeA = getTimeValue(a.timestamp);
+      const timeB = getTimeValue(b.timestamp);
       return timeA - timeB;
     });
     
@@ -222,8 +238,23 @@ export default function VoiceChat(_props: VoiceChatProps) {
         if (item.updatedState) {
           content += `\n${item.name} updated state: ${JSON.stringify(item.updatedState)}`;
         }
+        
+        // Handle tool call timestamp consistently with message timestamps
+        let toolTimestamp = new Date().toLocaleTimeString();
+        if (item.timestamp) {
+          // If it's already a time string, use it directly
+          if (typeof item.timestamp === 'string' && item.timestamp.includes(':')) {
+            toolTimestamp = item.timestamp;
+          } else {
+            // If it's a date object or full date string, convert to time only
+            toolTimestamp = new Date(item.timestamp).toLocaleTimeString();
+          }
+        } else if (item.created_at) {
+          toolTimestamp = new Date(item.created_at).toLocaleTimeString();
+        }
+        
         formattedHistory.push({
-          timestamp: item.timestamp || new Date().toLocaleTimeString(),
+          timestamp: toolTimestamp,
           role: 'tool',
           content,
           type: 'tool_call',
