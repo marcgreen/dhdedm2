@@ -809,16 +809,16 @@ Experiences represent character's background, training, and personality:
 Using Experiences:
 1. Player describes how their Experience applies
 2. They spend 1 Hope to activate it
-3. Add +2 to their roll (NOT +1d6!)
+3. Add +2 to their roll
 4. Mark it as used until the next scene
 5. Each Experience only works once per scene
 
 ## Conditions
 
 ### Core Conditions
-- **Vulnerable**: Out of Stress. All rolls targeting them have disadvantage.
-- **Hidden**: Concealed from enemies. Attacks against them have disadvantage. Ends if you attack or are seen.
-- **Restrained**: Can't move but can act. Often requires action + roll to escape.
+- **Hidden**: While you’re out of sight from all enemies and they don’t otherwise know your location, you gain the Hidden condition. Any rolls against a Hidden creature have disadvantage. After an adversary moves to where they would see you, you move into their line of sight, or you make an attack, you are no longer Hidden.
+- **Restrained**: Restrained characters can’t move, but you can still take actions from their current position.
+- **Vulnerable**: When a creature is Vulnerable, all rolls targeting them have advantage.
 
 ### Temporary Conditions
 By default, PCs can mark 1 Stress to clear a temporary condition. Special conditions may have specific requirements.
