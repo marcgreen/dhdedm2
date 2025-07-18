@@ -94,6 +94,14 @@ Domain cards are special abilities that represent the character's connection to 
 - **Type**: Class feature
 - **Status**: Inactive by default
 
+#### Rogue's Dodge
+- **Description**: Spend 3 Hope to gain a +2 bonus to your Evasion until the next time an attack succeeds against you. Otherwise, this bonus lasts until your next rest.
+- **Type**: Hope feature
+- **Hope Cost**: 3
+- **Evasion Bonus**: +2
+- **Duration**: Until next successful attack or rest
+- **Status**: Inactive by default
+
 ## Equipment System
 
 The system tracks weapons, armor, and inventory items with their properties and effects.
@@ -159,6 +167,13 @@ The system tracks weapons, armor, and inventory items with their properties and 
 - `useItem`: Use a consumable item
 - `gold`: Modify gold amount
 
+### Rest Functionality
+
+#### `rest(args)`
+- `clearStress`: Clear a specified amount of stress
+- `restoreHp`: Restore a specified amount of HP
+- **Automatic Effects**: Deactivates temporary features like Rogue's Dodge
+
 ### Enhanced Damage Calculation
 
 #### `rollDamage(args)`
@@ -182,6 +197,7 @@ The following new tools are available via WebSocket:
 4. **`update_inventory`** - Enhanced inventory management (merged functionality)
 5. **`update_domain_cards`** - Manage domain cards
 6. **`roll_damage`** - Updated to include Sneak Attack parameters
+7. **`rest`** - Rest functionality to recover and deactivate temporary features
 
 ## AI DM Integration
 

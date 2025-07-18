@@ -443,11 +443,12 @@ Deno.test("Features and equipment are properly initialized", () => {
   const state = gameManager.getState();
   
   // Check that features are initialized
-  assertEquals(state.player.features.length, 4);
+  assertEquals(state.player.features.length, 5);
   assertEquals(state.player.features[0].name, "Cloaked");
   assertEquals(state.player.features[1].name, "Sneak Attack");
   assertEquals(state.player.features[1].tier, 1);
   assertEquals(state.player.features[1].damageDice, 1);
+  assertEquals(state.player.features[4].name, "Rogue's Dodge");
   
   // Check that equipment is initialized
   assertEquals(state.player.equipment.weapons.primary.name, "Crossbow");
@@ -815,6 +816,7 @@ Deno.test("formatGameStateForAI produces exact expected output", () => {
 - Sneak Attack: When you succeed on an attack while Cloaked or while an ally is within Melee range of your target, add a number of d6s equal to your tier to your damage roll.
 - Shadow Stepper: You can move from shadow to shadow. When you move into an area of darkness or a shadow cast by another creature or object, you can mark a Stress to disappear from where you are and reappear inside another shadow within Far range. When you reappear, you are Cloaked.
 - Low-Light Living: When you're in an area with low light or heavy shadow, you have advantage on rolls to hide, investigate, or perceive details within that area.
+- Rogue's Dodge: Spend 3 Hope to gain a +2 bonus to your Evasion until the next time an attack succeeds against you. Otherwise, this bonus lasts until your next rest.
 
 **DOMAIN-KARTEN:**
 - Deft Deceiver (grace Level 1): Spend a Hope to gain advantage on a roll to deceive or trick someone into believing a lie you tell them.
@@ -909,4 +911,63 @@ Deno.test("Attributes are used in action rolls", () => {
   });
   
   assertEquals(finesseResult.attributeModifier, 3);
+});
+
+Deno.test("Rogue's Dodge feature mechanics", () => {
+  const gameManager = createGameManager("test-rogues-dodge");
+  
+  // Test activating Rogue's Dodge with sufficient Hope
+  gameManager.updatePlayer({ hope: 5 }); // Ensure enough Hope
+  let state = gameManager.getState();
+  const initialEvasion = state.player.evasion;
+  const initialHope = state.player.hope;
+  
+  // Activate Rogue's Dodge
+  const result = gameManager.updateFeatures({ activateFeature: "Rogue's Dodge" });
+  assert(result.success);
+  assert(result.changes.includes("feature activated: Rogue's Dodge"));
+  assert(result.changes.includes("spent 3 Hope, gained +2 Evasion"));
+  
+  // Verify state changes
+  state = gameManager.getState();
+  assertEquals(state.player.evasion, initialEvasion + 2);
+  assertEquals(state.player.hope, initialHope - 3);
+  
+  // Verify feature is active
+  const roguesDodge = state.player.features.find((f: any) => f.name === "Rogue's Dodge");
+  assert(roguesDodge.active);
+  
+  // Test that Rogue's Dodge deactivates when taking damage
+  const damageResult = gameManager.dealDamageToPlayer({ damage: 10 });
+  assert(damageResult.roguesDodgeDeactivated === true);
+  
+  // Verify evasion bonus is removed
+  state = gameManager.getState();
+  assertEquals(state.player.evasion, initialEvasion);
+  
+  // Verify feature is no longer active
+  const roguesDodgeAfter = state.player.features.find((f: any) => f.name === "Rogue's Dodge");
+  assert(!roguesDodgeAfter.active);
+  
+  // Test that Rogue's Dodge deactivates on rest
+  gameManager.updatePlayer({ hope: 5 });
+  gameManager.updateFeatures({ activateFeature: "Rogue's Dodge" });
+  state = gameManager.getState();
+  assertEquals(state.player.evasion, initialEvasion + 2);
+  
+  const restResult = gameManager.rest({});
+  assert(restResult.success);
+  assert(restResult.changes.includes("Rogue's Dodge deactivated due to rest"));
+  
+  state = gameManager.getState();
+  assertEquals(state.player.evasion, initialEvasion);
+  
+  // Test insufficient Hope
+  gameManager.updatePlayer({ hope: 1 });
+  const insufficientResult = gameManager.updateFeatures({ activateFeature: "Rogue's Dodge" });
+  assert(insufficientResult.changes.includes("insufficient Hope to activate Rogue's Dodge"));
+  
+  state = gameManager.getState();
+  const roguesDodgeInsufficient = state.player.features.find((f: any) => f.name === "Rogue's Dodge");
+  assert(!roguesDodgeInsufficient.active);
 });

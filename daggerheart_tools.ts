@@ -139,6 +139,14 @@ export const createDefaultGameState = () => ({
         name: 'Low-Light Living',
         type: 'heritage',
         description: 'When you\'re in an area with low light or heavy shadow, you have advantage on rolls to hide, investigate, or perceive details within that area.',
+      },
+      {
+        name: 'Rogue\'s Dodge',
+        type: 'hope',
+        description: 'Spend 3 Hope to gain a +2 bonus to your Evasion until the next time an attack succeeds against you. Otherwise, this bonus lasts until your next rest.',
+        hopeCost: 3,
+        evasionBonus: 2,
+        active: false
       }
     ]
   },
@@ -411,6 +419,18 @@ export class DaggerheartGameManager {
       if (feature) {
         feature.active = true;
         changes.push(`feature activated: ${args.activateFeature}`);
+        
+        // Handle Rogue's Dodge activation
+        if (feature.name === 'Rogue\'s Dodge' && feature.type === 'hope') {
+          if (state.player.hope >= feature.hopeCost) {
+            state.player.hope -= feature.hopeCost;
+            state.player.evasion += feature.evasionBonus;
+            changes.push(`spent ${feature.hopeCost} Hope, gained +${feature.evasionBonus} Evasion`);
+          } else {
+            feature.active = false;
+            changes.push(`insufficient Hope to activate ${feature.name}`);
+          }
+        }
       }
     }
     
@@ -419,6 +439,12 @@ export class DaggerheartGameManager {
       if (feature) {
         feature.active = false;
         changes.push(`feature deactivated: ${args.deactivateFeature}`);
+        
+        // Handle Rogue's Dodge deactivation
+        if (feature.name === 'Rogue\'s Dodge' && feature.type === 'hope' && feature.active) {
+          state.player.evasion -= feature.evasionBonus;
+          changes.push(`removed +${feature.evasionBonus} Evasion bonus`);
+        }
       }
     }
     
@@ -899,6 +925,17 @@ export class DaggerheartGameManager {
     // Check for death
     const deathCheck = state.player.hp.current === 0;
     
+    // Deactivate Rogue's Dodge if attack succeeded and caused damage
+    let roguesDodgeDeactivated = false;
+    if (hpLost > 0) {
+      const roguesDodge = state.player.features.find((f: any) => f.name === 'Rogue\'s Dodge' && f.active);
+      if (roguesDodge) {
+        roguesDodge.active = false;
+        state.player.evasion -= roguesDodge.evasionBonus;
+        roguesDodgeDeactivated = true;
+      }
+    }
+    
     this.updateGameState({ player: state.player });
     
     return {
@@ -907,7 +944,8 @@ export class DaggerheartGameManager {
       damageAfterReduction: finalDamage,
       newVulnerable,
       deathCheck,
-      thresholdReached
+      thresholdReached,
+      roguesDodgeDeactivated
     };
   }
 
@@ -982,6 +1020,46 @@ export class DaggerheartGameManager {
       newTotal: state.gm.fear,
       effect,
       spotlightToGM: purpose === 'spotlight'
+    };
+  }
+
+  // Rest functionality - deactivates temporary features
+  rest(args: any) {
+    const state = this.getGameState();
+    const changes: string[] = [];
+    
+    // Deactivate Rogue's Dodge if active
+    const roguesDodge = state.player.features.find((f: any) => f.name === 'Rogue\'s Dodge' && f.active);
+    if (roguesDodge) {
+      roguesDodge.active = false;
+      state.player.evasion -= roguesDodge.evasionBonus;
+      changes.push(`Rogue's Dodge deactivated due to rest`);
+    }
+    
+    // Clear stress (optional)
+    if (args.clearStress) {
+      const oldStress = state.player.stress.current;
+      state.player.stress.current = Math.max(0, state.player.stress.current - args.clearStress);
+      changes.push(`stress cleared: ${oldStress}→${state.player.stress.current}`);
+    }
+    
+    // Restore HP (optional)
+    if (args.restoreHp) {
+      const oldHp = state.player.hp.current;
+      state.player.hp.current = Math.min(state.player.hp.max, state.player.hp.current + args.restoreHp);
+      changes.push(`hp restored: ${oldHp}→${state.player.hp.current}`);
+    }
+    
+    this.updateGameState({ player: state.player });
+    
+    return {
+      success: true,
+      changes,
+      newState: {
+        hp: state.player.hp,
+        stress: state.player.stress,
+        evasion: state.player.evasion
+      }
     };
   }
 }

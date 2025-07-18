@@ -13,7 +13,8 @@ const toolCallLogs = new Map<string, any[]>();
 // Helper to log a tool call event
 function logToolCall(sessionId: string, event: any) {
   if (!toolCallLogs.has(sessionId)) toolCallLogs.set(sessionId, []);
-  toolCallLogs.get(sessionId).push(event);
+  const logs = toolCallLogs.get(sessionId);
+  if (logs) logs.push(event);
 }
 
 // Helper function to send game state updates
@@ -746,6 +747,49 @@ const createDaggerheartTools = (sessionId: string) => {
     },
   });
 
+  // Rest functionality tool
+  const restTool = tool({
+    name: 'rest',
+    description: 'Rest to recover and deactivate temporary features like Rogue\'s Dodge',
+    parameters: {
+      type: 'object',
+      properties: {
+        clearStress: { type: 'number' },
+        restoreHp: { type: 'number' }
+      },
+      required: [],
+      additionalProperties: false,
+    },
+    async execute(args: any) {
+      const now = new Date().toISOString();
+      let output, error = null;
+      try {
+        output = gameManager.rest(args);
+        const gameState = gameManager.getState();
+        const toolResult: ToolResult = {
+          name: 'rest',
+          parameters: args,
+          output: output,
+          gameState: gameState
+        };
+        sendGameStateUpdate(sessionId, toolResult);
+      } catch (err) {
+        error = err instanceof Error ? err.message : String(err);
+      }
+      logToolCall(sessionId, {
+        type: 'tool_call',
+        name: 'rest',
+        status: error ? 'failed' : 'succeeded',
+        arguments: args,
+        output: error ? undefined : output,
+        error: error || undefined,
+        timestamp: now,
+      });
+      if (error) throw error;
+      return output;
+    },
+  });
+
   return [
     getStateTool,
     updatePlayerTool,
@@ -763,6 +807,7 @@ const createDaggerheartTools = (sessionId: string) => {
     updateEquipmentTool,
     updateDomainCardsTool,
     updateAttributesTool,
+    restTool,
   ];
 };
 
@@ -1438,14 +1483,14 @@ Starte mit einer freundlichen Begrüßung und frage nach dem Namen des Charakter
                 }
                 
                 // Merge tool call logs for this session
-                const sessionToolCalls = toolCallLogs.get(sessionId) || [];
+                const sessionToolCalls = toolCallLogs.get(sessionId!) || [];
                 // Merge and sort by timestamp (if timestamps are comparable)
                 const mergedHistory = [...history, ...sessionToolCalls].sort((a, b) => {
                   const timeA = new Date(`1970-01-01 ${a.timestamp}`).getTime();
                   const timeB = new Date(`1970-01-01 ${b.timestamp}`).getTime();
                   return timeA - timeB;
                 });
-                sockets.get(sessionId)?.send(JSON.stringify({
+                sockets.get(sessionId!)?.send(JSON.stringify({
                   type: 'history_updated',
                   history: mergedHistory
                 }));
