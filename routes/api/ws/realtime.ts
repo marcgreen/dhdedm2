@@ -1282,6 +1282,145 @@ Keep players engaged with optional goals:
 
 Always respond in character as the GM. Keep descriptions concise but evocative. Focus on what the player character experiences. Play to find out what happens!`;
               
+              const sceneGuide = `Modular Cinematic Solo TTRPG Stories: Daggerheart Guide
+Core Modular Structure
+Three-Act Spine:
+
+Hook: Immediate action/choice, establish stakes through Experience connection
+Challenge: 2-3 spotlight transitions with escalating complications
+Climax: Major Hope expenditure opportunity, final high-stakes roll
+
+Essential Prep Components
+Character Connection:
+
+One Experience that will definitely apply (+2 bonus)
+Personal stake tied to background
+Clear skill/trait they'll showcase
+
+Core Conflict with Daggerheart Flow:
+
+Single objective requiring 2-3 Action rolls
+One main adversary (appropriate tier)
+Multiple approaches using different Traits
+Built-in Hope/Fear generation opportunities
+
+Modular Obstacles:
+
+Base: Core challenge with clear difficulty
+Complication: Add disadvantage or raise stakes
+Personal: Tie to Experience or background
+Escalation: Adversary special abilities requiring Fear
+
+Fear Economy Plan:
+
+Target total Fear generation for session length
+2-3 planned expenditures (spotlight, damage, abilities)
+One major spend for climax moment
+
+Daggerheart Mechanics Integration
+Hope/Fear as Pacing Engine:
+
+Success with Hope: Momentum, player keeps spotlight
+Success with Fear: Complications, spotlight shifts to GM
+Failure with Hope: Setbacks with opportunities, GM takes spotlight
+Failure with Fear: Escalation, GM gains spotlight AND Fear
+
+Spotlight Management:
+
+Player starts with spotlight (immediate choice)
+Spend 1 Fear to keep spotlight when it would return
+Use spotlight shifts to control pacing and tension
+
+Experience Integration:
+
+Ask "How does your [Experience] help here?"
+Make +2 bonuses feel heroic and meaningful
+Connect to character background naturally
+
+Modular Design Techniques
+Expandable Scenes:
+
+Compressed: Single roll with narrative resolution
+Standard: Action roll + consequence + response
+Extended: Multiple phases with spotlight shifts
+
+Scalable Opposition:
+
+Minion: Quick obstacles, minimal Fear cost
+Standard: Even match, moderate Fear generation
+Enhanced: Spend Fear for special abilities and complications
+
+Flexible Consequences:
+
+Light: Conditions, resource costs, minor setbacks
+Moderate: HP damage, separated from allies, equipment issues
+Heavy: Major complications, adversary advantages, environmental hazards
+
+Cinematic Techniques
+Start In Media Res: Drop into immediate action requiring first roll
+Personal Stakes: Connect conflict to character's Experience/background
+Escalating Tension: Each spotlight shift raises stakes
+Heroic Moments: Create Hope-spending opportunities that feel epic
+Session Flow Pattern
+
+Opening Choice: Present immediate decision requiring Action roll
+Complication Cascade: Use Hope/Fear results to drive spotlight shifts
+Experience Moments: Create opportunities for +2 bonuses that matter
+Fear Expenditure: Use accumulated Fear for memorable GM moves
+Climactic Choice: Final high-stakes roll with clear consequences
+
+Quick GM Tools
+During Action Rolls:
+
+Always ask which Trait applies
+Check for Experience use opportunities
+Apply advantages/disadvantages from fiction
+Generate Hope/Fear correctly
+
+GM Move Selection:
+
+Soft Moves: Build tension, ask questions, signal threats
+Hard Moves: Deal damage, activate abilities, escalate immediately
+Match move intensity to roll results and current Fear level
+
+Spotlight Transitions:
+
+Keep flowing: Success with Hope = "What do you do next?"
+Add complications: Success with Fear = "That works, but..."
+Escalate: Failure = Take spotlight, make appropriate move
+
+Modular Elements Library
+Quick Adversary Stats:
+
+Difficulty = 10 + (Tier × 2)
+HP based on intended scene length
+One signature ability costing 2-3 Fear
+
+Environmental Factors:
+
+Time pressure (countdowns)
+Terrain advantages/disadvantages
+Interactive elements requiring different Traits
+
+Complication Menu:
+
+Reinforcements (spend Fear)
+Equipment failure
+Innocent bystanders
+Moral dilemmas
+Resource depletion
+
+Success Markers
+
+Player feels immediate engagement from opening
+Multiple meaningful choices throughout
+Hope/Fear economy creates natural tension
+Experiences feel relevant and powerful
+Resolution feels earned, not given
+Clear consequences that matter for future stories
+
+The key is building a story skeleton that uses Daggerheart's Hope/Fear/Spotlight mechanics to create natural pacing while remaining flexible enough to expand or compress based on available time and player engagement.`;
+
               // Get current game state to inject into AI instructions
               const gameManager = createGameManager(sessionId!);
               const currentGameState = gameManager.getState();
@@ -1386,9 +1525,9 @@ ${gameStateInfo}
 
 **WICHTIG:** Nutze diese Charakterinformationen aktiv in deiner Rolle als GM. Verweise auf den Hintergrund, die Beziehungen und die Motivation des Charakters. Berücksichtige die Attribute bei Würfen und die Ausrüstung bei Beschreibungen.
 
-
-Starte mit einer freundlichen Begrüßung und frage nach dem Namen des Charakters. Nutze dann die Tools für die Charaktererstellung, und beschreibe die erste Szene--lass uns direkt in die cinematische Szene einsteigen!`,
-                tools: tools,
+Starte direkt mit der ersten Szene. Hier ist ein Guide für die Szene:
+${sceneGuide}
+`,                tools: tools,
               });
 
               // Create session with WebSocket transport (for server-side use)
