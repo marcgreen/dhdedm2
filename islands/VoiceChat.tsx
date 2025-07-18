@@ -878,7 +878,11 @@ export default function VoiceChat(_props: VoiceChatProps) {
             {uiState.value.gameState.player.background && (
               <div class="flex justify-between text-gray-300">
                 <span>Hintergrund:</span>
-                <span class="text-blue-400">{uiState.value.gameState.player.background}</span>
+                <span class="text-blue-400">
+                  {typeof uiState.value.gameState.player.background === 'string' 
+                    ? uiState.value.gameState.player.background 
+                    : uiState.value.gameState.player.background.motivation || 'Soldat'}
+                </span>
               </div>
             )}
             <div class="flex justify-between text-gray-300">
@@ -955,7 +959,7 @@ export default function VoiceChat(_props: VoiceChatProps) {
                 <div class="flex flex-wrap gap-1">
                   {uiState.value.gameState.player.experiences.map((experience, index) => (
                     <span key={index} class="bg-purple-900 px-2 py-1 rounded text-xs text-purple-300">
-                      {experience}
+                      {typeof experience === 'string' ? experience : (experience as any).name}
                     </span>
                   ))}
                 </div>
@@ -993,7 +997,7 @@ export default function VoiceChat(_props: VoiceChatProps) {
                 <div class="flex flex-wrap gap-1">
                   {uiState.value.gameState.player.inventory.map((item, index) => (
                     <span key={index} class="bg-slate-700 px-2 py-1 rounded text-xs text-gray-300">
-                      {item}
+                      {typeof item === 'string' ? item : item.name}
                     </span>
                   ))}
                 </div>

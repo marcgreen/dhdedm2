@@ -7,7 +7,7 @@ const gameStates = new Map<string, any>();
 // Default game state for new sessions
 export const createDefaultGameState = () => ({
   player: {
-    name: '',
+    name: 'Poppy',
     level: 1,
     hp: { current: 6, max: 6 },
     stress: { current: 0, max: 5 },
