@@ -201,6 +201,17 @@ The AI DM now receives the complete player state information at the start of eac
 
 This ensures the AI DM has full context about the player's character and can make informed decisions that are appropriate to the character's background, abilities, and current situation.
 
+### Game State Formatting
+
+The game state formatting logic has been extracted into a reusable `formatGameStateForAI()` function that:
+
+- **Produces consistent output**: The exact same formatting is used in both production and tests
+- **Handles all data types**: Properly formats strings, numbers, arrays, and objects
+- **Includes comprehensive testing**: Exact string matching ensures the AI receives the expected format
+- **Maintains backward compatibility**: Works with both string-based and object-based experiences
+
+This ensures that what the AI DM receives is exactly what we test for, providing confidence in the integration.
+
 ## Usage Examples
 
 ### Updating Individual Attributes

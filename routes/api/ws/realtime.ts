@@ -1,7 +1,7 @@
 import { Handlers } from "$fresh/server.ts";
 import { RealtimeAgent, RealtimeSession } from "@openai/agents-realtime";
 import { tool } from "@openai/agents-realtime";
-import { createGameManager } from "../../../daggerheart_tools.ts";
+import { createGameManager, formatGameStateForAI } from "../../../daggerheart_tools.ts";
 import { GameState, ToolResult } from "../../../types.ts";
 
 // Store active sessions
@@ -1242,67 +1242,7 @@ Always respond in character as the GM. Keep descriptions concise but evocative. 
               const currentGameState = gameManager.getState();
               
               // Format game state for AI consumption
-              const gameStateInfo = `
-**AKTUELLER SPIELERZUSTAND:**
-- **Name**: ${currentGameState.player.name || 'Unbenannt'}
-- **Level**: ${currentGameState.player.level}
-- **Klasse**: ${currentGameState.player.class}
-- **HP**: ${currentGameState.player.hp.current}/${currentGameState.player.hp.max}
-- **Stress**: ${currentGameState.player.stress.current}/${currentGameState.player.stress.max}
-- **Hoffnung**: ${currentGameState.player.hope}
-- **Rüstung**: ${currentGameState.player.armor.current}/${currentGameState.player.armor.max}
-- **Ausweichen**: ${currentGameState.player.evasion}
-- **Schwellenwerte**: Major ${currentGameState.player.thresholds.major}, Severe ${currentGameState.player.thresholds.severe}
-
-**ATTRIBUTE:**
-- Agility: ${currentGameState.player.attributes.Agility}
-- Strength: ${currentGameState.player.attributes.Strength}
-- Finesse: ${currentGameState.player.attributes.Finesse}
-- Instinct: ${currentGameState.player.attributes.Instinct}
-- Presence: ${currentGameState.player.attributes.Presence}
-- Knowledge: ${currentGameState.player.attributes.Knowledge}
-
-**CHARAKTERHINTERGRUND:**
-- **Motivation**: ${currentGameState.player.background.motivation}
-- **Persönlichkeit**: ${currentGameState.player.background.personality}
-- **Glauben**: ${currentGameState.player.background.beliefs}
-- **Geschichte**: ${currentGameState.player.background.backgroundStory}
-- **Weltverbindungen**: ${currentGameState.player.background.worldConnections}
-- **Wichtige Beziehungen**: ${currentGameState.player.background.importantRelationships.join(', ')}
-- **Geheimnisse**: ${currentGameState.player.background.secretsAndMysteries}
-
-**AUSRÜSTUNG:**
-- **Primärwaffe**: ${currentGameState.player.equipment.weapons.primary.name} (${currentGameState.player.equipment.weapons.primary.damage})
-- **Sekundärwaffe**: ${currentGameState.player.equipment.weapons.secondary.name} (${currentGameState.player.equipment.weapons.secondary.damage})
-- **Rüstung**: ${currentGameState.player.equipment.armor.name} (${currentGameState.player.equipment.armor.armorScore} Armor)
-
-**FÄHIGKEITEN:**
-${currentGameState.player.features.map((f: any) => `- ${f.name}: ${f.description}`).join('\n')}
-
-**DOMAIN-KARTEN:**
-${currentGameState.player.domain_cards.map((c: any) => `- ${c.name} (${c.type} Level ${c.level}): ${c.description}`).join('\n')}
-
-**INVENTAR:**
-${currentGameState.player.inventory.map((i: any) => `- ${i.name}: ${i.description}`).join('\n')}
-- **Gold**: ${currentGameState.player.gold}
-
-**ERFAHRUNGEN:**
-${currentGameState.player.experiences.map((e: any) => `- ${e.name}${e.used ? ' (verwendet)' : ''}`).join('\n')}
-
-**ZUSTÄNDE:**
-${currentGameState.player.conditions.length > 0 ? currentGameState.player.conditions.join(', ') : 'Keine'}
-
-**AKTUELLE POSITION:**
-${currentGameState.player.currentLocation}
-
-**GM-ZUSTAND:**
-- **Furcht**: ${currentGameState.gm.fear}
-- **Spotlight**: ${currentGameState.gm.hasSpotlight ? 'GM' : 'Spieler'}
-
-**SZENE:**
-- **Aktuelle Szene**: ${currentGameState.scene.currentScene}
-- **Beschreibung**: ${currentGameState.scene.sceneDescription}
-`;
+              const gameStateInfo = formatGameStateForAI(currentGameState);
 
               const agent = new RealtimeAgent({
                 name: 'Der Spielleiter',

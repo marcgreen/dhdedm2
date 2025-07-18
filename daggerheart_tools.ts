@@ -986,6 +986,71 @@ export class DaggerheartGameManager {
   }
 }
 
+// Format game state for AI consumption
+export const formatGameStateForAI = (state: any) => {
+  return `
+**AKTUELLER SPIELERZUSTAND:**
+- **Name**: ${state.player.name || 'Unbenannt'}
+- **Level**: ${state.player.level}
+- **Klasse**: ${state.player.class}
+- **HP**: ${state.player.hp.current}/${state.player.hp.max}
+- **Stress**: ${state.player.stress.current}/${state.player.stress.max}
+- **Hoffnung**: ${state.player.hope}
+- **Rüstung**: ${state.player.armor.current}/${state.player.armor.max}
+- **Ausweichen**: ${state.player.evasion}
+- **Schwellenwerte**: Major ${state.player.thresholds.major}, Severe ${state.player.thresholds.severe}
+
+**ATTRIBUTE:**
+- Agility: ${state.player.attributes.Agility}
+- Strength: ${state.player.attributes.Strength}
+- Finesse: ${state.player.attributes.Finesse}
+- Instinct: ${state.player.attributes.Instinct}
+- Presence: ${state.player.attributes.Presence}
+- Knowledge: ${state.player.attributes.Knowledge}
+
+**CHARAKTERHINTERGRUND:**
+- **Motivation**: ${state.player.background.motivation}
+- **Persönlichkeit**: ${state.player.background.personality}
+- **Glauben**: ${state.player.background.beliefs}
+- **Geschichte**: ${state.player.background.backgroundStory}
+- **Weltverbindungen**: ${state.player.background.worldConnections}
+- **Wichtige Beziehungen**: ${state.player.background.importantRelationships.join(', ')}
+- **Geheimnisse**: ${state.player.background.secretsAndMysteries}
+
+**AUSRÜSTUNG:**
+- **Primärwaffe**: ${state.player.equipment.weapons.primary.name} (${state.player.equipment.weapons.primary.damage})
+- **Sekundärwaffe**: ${state.player.equipment.weapons.secondary.name} (${state.player.equipment.weapons.secondary.damage})
+- **Rüstung**: ${state.player.equipment.armor.name} (${state.player.equipment.armor.armorScore} Armor)
+
+**FÄHIGKEITEN:**
+${state.player.features.map((f: any) => `- ${f.name}: ${f.description}`).join('\n')}
+
+**DOMAIN-KARTEN:**
+${state.player.domain_cards.map((c: any) => `- ${c.name} (${c.type} Level ${c.level}): ${c.description}`).join('\n')}
+
+**INVENTAR:**
+${state.player.inventory.map((i: any) => `- ${i.name}: ${i.description}`).join('\n')}
+- **Gold**: ${state.player.gold}
+
+**ERFAHRUNGEN:**
+${state.player.experiences.map((e: any) => `- ${typeof e === 'string' ? e : e.name}${e.used ? ' (verwendet)' : ''}`).join('\n')}
+
+**ZUSTÄNDE:**
+${state.player.conditions.length > 0 ? state.player.conditions.join(', ') : 'Keine'}
+
+**AKTUELLE POSITION:**
+${state.player.currentLocation}
+
+**GM-ZUSTAND:**
+- **Furcht**: ${state.gm.fear}
+- **Spotlight**: ${state.gm.hasSpotlight ? 'GM' : 'Spieler'}
+
+**SZENE:**
+- **Aktuelle Szene**: ${state.scene.currentScene}
+- **Beschreibung**: ${state.scene.sceneDescription}
+`;
+};
+
 // Factory function for creating game managers
 export const createGameManager = (sessionId: string) => {
   return new DaggerheartGameManager(sessionId);

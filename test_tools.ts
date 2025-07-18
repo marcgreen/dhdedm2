@@ -1,5 +1,5 @@
 // Minimal automated test for Daggerheart tools - Testing actual production code
-import { createGameManager } from "./daggerheart_tools.ts";
+import { createGameManager, formatGameStateForAI } from "./daggerheart_tools.ts";
 
 // Simple assertions (minimal approach)
 const assertEquals = (actual: any, expected: any, message?: string) => {
@@ -741,68 +741,8 @@ Deno.test("Game state formatting for AI injection", () => {
   assert(typeof state.scene.currentScene === 'string');
   assert(typeof state.scene.sceneDescription === 'string');
   
-  // Test that the state can be formatted without errors
-  const gameStateInfo = `
-**AKTUELLER SPIELERZUSTAND:**
-- **Name**: ${state.player.name || 'Unbenannt'}
-- **Level**: ${state.player.level}
-- **Klasse**: ${state.player.class}
-- **HP**: ${state.player.hp.current}/${state.player.hp.max}
-- **Stress**: ${state.player.stress.current}/${state.player.stress.max}
-- **Hoffnung**: ${state.player.hope}
-- **Rüstung**: ${state.player.armor.current}/${state.player.armor.max}
-- **Ausweichen**: ${state.player.evasion}
-- **Schwellenwerte**: Major ${state.player.thresholds.major}, Severe ${state.player.thresholds.severe}
-
-**ATTRIBUTE:**
-- Agility: ${state.player.attributes.Agility}
-- Strength: ${state.player.attributes.Strength}
-- Finesse: ${state.player.attributes.Finesse}
-- Instinct: ${state.player.attributes.Instinct}
-- Presence: ${state.player.attributes.Presence}
-- Knowledge: ${state.player.attributes.Knowledge}
-
-**CHARAKTERHINTERGRUND:**
-- **Motivation**: ${state.player.background.motivation}
-- **Persönlichkeit**: ${state.player.background.personality}
-- **Glauben**: ${state.player.background.beliefs}
-- **Geschichte**: ${state.player.background.backgroundStory}
-- **Weltverbindungen**: ${state.player.background.worldConnections}
-- **Wichtige Beziehungen**: ${state.player.background.importantRelationships.join(', ')}
-- **Geheimnisse**: ${state.player.background.secretsAndMysteries}
-
-**AUSRÜSTUNG:**
-- **Primärwaffe**: ${state.player.equipment.weapons.primary.name} (${state.player.equipment.weapons.primary.damage})
-- **Sekundärwaffe**: ${state.player.equipment.weapons.secondary.name} (${state.player.equipment.weapons.secondary.damage})
-- **Rüstung**: ${state.player.equipment.armor.name} (${state.player.equipment.armor.armorScore} Armor)
-
-**FÄHIGKEITEN:**
-${state.player.features.map((f: any) => `- ${f.name}: ${f.description}`).join('\n')}
-
-**DOMAIN-KARTEN:**
-${state.player.domain_cards.map((c: any) => `- ${c.name} (${c.type} Level ${c.level}): ${c.description}`).join('\n')}
-
-**INVENTAR:**
-${state.player.inventory.map((i: any) => `- ${i.name}: ${i.description}`).join('\n')}
-- **Gold**: ${state.player.gold}
-
-**ERFAHRUNGEN:**
-${state.player.experiences.map((e: any) => `- ${e.name}${e.used ? ' (verwendet)' : ''}`).join('\n')}
-
-**ZUSTÄNDE:**
-${state.player.conditions.length > 0 ? state.player.conditions.join(', ') : 'Keine'}
-
-**AKTUELLE POSITION:**
-${state.player.currentLocation}
-
-**GM-ZUSTAND:**
-- **Furcht**: ${state.gm.fear}
-- **Spotlight**: ${state.gm.hasSpotlight ? 'GM' : 'Spieler'}
-
-**SZENE:**
-- **Aktuelle Szene**: ${state.scene.currentScene}
-- **Beschreibung**: ${state.scene.sceneDescription}
-`;
+  // Test that the state can be formatted without errors using the production function
+  const gameStateInfo = formatGameStateForAI(state);
 
   // Test that the formatted string contains expected content
   assert(gameStateInfo.includes('AKTUELLER SPIELERZUSTAND'));
@@ -826,6 +766,89 @@ ${state.player.currentLocation}
   assert(gameStateInfo.includes('Pick and Pull'));
   assert(gameStateInfo.includes('Cloaked'));
   assert(gameStateInfo.includes('Sneak Attack'));
+});
+
+Deno.test("formatGameStateForAI produces exact expected output", () => {
+  const gameManager = createGameManager("test-formatting-function");
+  const state = gameManager.getState();
+  
+  // Test the formatting function directly
+  const formatted = formatGameStateForAI(state);
+  
+  // Expected exact output for default state
+  const expectedOutput = `
+**AKTUELLER SPIELERZUSTAND:**
+- **Name**: Unbenannt
+- **Level**: 1
+- **Klasse**: Rogue
+- **HP**: 6/6
+- **Stress**: 0/5
+- **Hoffnung**: 2
+- **Rüstung**: 3/3
+- **Ausweichen**: 12
+- **Schwellenwerte**: Major 7, Severe 13
+
+**ATTRIBUTE:**
+- Agility: 1
+- Strength: -1
+- Finesse: 2
+- Instinct: 0
+- Presence: 1
+- Knowledge: 0
+
+**CHARAKTERHINTERGRUND:**
+- **Motivation**: Protecting their homeland from industrial expansion that's draining the wetlands for profit
+- **Persönlichkeit**: Speaks in short, croaking sentences. Patient and observant, but quick to act when opportunity strikes. Tends to sit very still, then move explosively
+- **Glauben**: "The marsh remembers everything" - believes in natural balance and that patience reveals all secrets
+- **Geschichte**: Born in the Singing Marshes, they learned stealth from hunting flies and avoiding predators. When industrial crews began draining their homeland, they turned to thievery - stealing from the companies destroying wetlands and fencing goods to fund resistance efforts.
+- **Weltverbindungen**: Part of an underground network smuggling displaced marsh creatures to safety
+- **Wichtige Beziehungen**: Elder Croakwise (mentor who taught them stealth), their clutch-sibling Tadwick (captured by poachers), Mama Bullseye (crime boss who gave them their first heist job)
+- **Geheimnisse**: they're searching for an ancient frog artifact that could restore dried marshlands
+
+**AUSRÜSTUNG:**
+- **Primärwaffe**: Crossbow (1d6+1)
+- **Sekundärwaffe**: Small Dagger (1d8)
+- **Rüstung**: Gambeson Armor (3 Armor)
+
+**FÄHIGKEITEN:**
+- Cloaked: Any time you would be Hidden, you are instead Cloaked. In addition to the benefits of the Hidden condition, while Cloaked you remain unseen if you are stationary when an adversary moves to where they would normally see you. After you make an attack or end a move within line of sight of an adversary, you are no longer Cloaked.
+- Sneak Attack: When you succeed on an attack while Cloaked or while an ally is within Melee range of your target, add a number of d6s equal to your tier to your damage roll.
+- Shadow Stepper: You can move from shadow to shadow. When you move into an area of darkness or a shadow cast by another creature or object, you can mark a Stress to disappear from where you are and reappear inside another shadow within Far range. When you reappear, you are Cloaked.
+- Low-Light Living: When you're in an area with low light or heavy shadow, you have advantage on rolls to hide, investigate, or perceive details within that area.
+
+**DOMAIN-KARTEN:**
+- Deft Deceiver (grace Level 1): Spend a Hope to gain advantage on a roll to deceive or trick someone into believing a lie you tell them.
+- Pick and Pull (midnight Level 1): You have advantage on action rolls to pick non-magical locks, disarm mechanical traps, or steal items from a target (things like bags, pouches, or containers carried or worn by someone within Melee range).
+
+**INVENTAR:**
+- Torch: Provides light in dark areas
+- 50 feet of rope: Useful for climbing and securing items
+- Basic supplies: Bedroll, rations, waterskin, and other essentials
+- Minor Stamina Potion: Clear 1d4 Stress
+- Grappling hook: A sturdy hook and rope for scaling walls and reaching difficult places
+- **Gold**: 10
+
+**ERFAHRUNGEN:**
+- Springloaded Legs
+- Silent Steps
+
+**ZUSTÄNDE:**
+Keine
+
+**AKTUELLE POSITION:**
+Starting Area
+
+**GM-ZUSTAND:**
+- **Furcht**: 2
+- **Spotlight**: Spieler
+
+**SZENE:**
+- **Aktuelle Szene**: Character Creation
+- **Beschreibung**: Du stehst am Beginn eines neuen Abenteuers...
+`;
+
+  // Compare the exact output
+  assertEquals(formatted, expectedOutput);
 });
 
 Deno.test("Background can be updated", () => {
