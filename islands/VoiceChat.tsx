@@ -952,6 +952,51 @@ export default function VoiceChat(_props: VoiceChatProps) {
               </div>
             )}
             
+            {/* Equipment */}
+            {uiState.value.gameState.player.equipment && (
+              <div class="mt-4">
+                <div class="text-gray-400 mb-2">Ausrüstung:</div>
+                
+                {/* Weapons */}
+                {uiState.value.gameState.player.equipment.weapons && (
+                  <div class="mb-2">
+                    <div class="text-xs text-gray-500 mb-1">Waffen:</div>
+                    {Object.entries(uiState.value.gameState.player.equipment.weapons).map(([slot, weapon]: [string, any]) => (
+                      <div key={slot} class="text-xs text-gray-300 mb-1">
+                        <span class="text-blue-300">{weapon.name}</span>
+                        <span class="text-gray-500"> ({slot === 'primary' ? 'Primär' : 'Sekundär'})</span>
+                        <span class="text-red-300"> {weapon.damage}</span>
+                        <span class="text-green-300"> {weapon.range}</span>
+                        {weapon.properties && weapon.properties.length > 0 && (
+                          <span class="text-yellow-300"> {weapon.properties.join(', ')}</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                
+                {/* Armor */}
+                {uiState.value.gameState.player.equipment.armor && (
+                  <div class="mb-2">
+                    <div class="text-xs text-gray-500 mb-1">Rüstung:</div>
+                    <div class="text-xs text-gray-300 mb-1">
+                      <span class="text-green-300">{uiState.value.gameState.player.equipment.armor.name}</span>
+                      <span class="text-green-300"> {uiState.value.gameState.player.equipment.armor.armorScore} Armor</span>
+                      {uiState.value.gameState.player.equipment.armor.thresholds && (
+                        <span class="text-blue-300"> Minor {uiState.value.gameState.player.equipment.armor.thresholds.minor}/Major {uiState.value.gameState.player.equipment.armor.thresholds.major}</span>
+                      )}
+                      {uiState.value.gameState.player.equipment.armor.properties && uiState.value.gameState.player.equipment.armor.properties.length > 0 && (
+                        <span class="text-yellow-300"> {uiState.value.gameState.player.equipment.armor.properties.join(', ')}</span>
+                      )}
+                      {uiState.value.gameState.player.equipment.armor.evasionBonus && (
+                        <span class="text-cyan-300"> +{uiState.value.gameState.player.equipment.armor.evasionBonus} Evasion</span>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+            
             {/* Experiences */}
             {uiState.value.gameState.player.experiences && uiState.value.gameState.player.experiences.length > 0 && (
               <div class="mt-4">
