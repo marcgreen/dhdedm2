@@ -183,6 +183,24 @@ The following new tools are available via WebSocket:
 5. **`update_domain_cards`** - Manage domain cards
 6. **`roll_damage`** - Updated to include Sneak Attack parameters
 
+## AI DM Integration
+
+The AI DM now receives the complete player state information at the start of each session, including:
+
+- **Character Stats**: HP, Stress, Hope, Armor, Evasion, Thresholds
+- **Attributes**: All six core attributes with their current values
+- **Background**: Complete character background with motivation, personality, beliefs, and relationships
+- **Equipment**: Current weapons, armor, and their properties
+- **Features**: All character features and their descriptions
+- **Domain Cards**: Available domain cards and their effects
+- **Inventory**: All items, gold, and consumables
+- **Experiences**: Available experiences and their usage status
+- **Conditions**: Current character conditions
+- **Location**: Current position and scene information
+- **GM State**: Current Fear level and spotlight status
+
+This ensures the AI DM has full context about the player's character and can make informed decisions that are appropriate to the character's background, abilities, and current situation.
+
 ## Usage Examples
 
 ### Updating Individual Attributes

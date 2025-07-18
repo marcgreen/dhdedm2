@@ -571,10 +571,10 @@ Deno.test("Domain cards are properly initialized", () => {
   // Check that domain cards are initialized
   assertEquals(state.player.domain_cards.length, 2);
   assertEquals(state.player.domain_cards[0].name, "Deft Deceiver");
-  assertEquals(state.player.domain_cards[0].type, "graceability");
+  assertEquals(state.player.domain_cards[0].type, "grace");
   assertEquals(state.player.domain_cards[0].level, 1);
   assertEquals(state.player.domain_cards[1].name, "Pick and Pull");
-  assertEquals(state.player.domain_cards[1].type, "midnightability");
+  assertEquals(state.player.domain_cards[1].type, "midnight");
   assertEquals(state.player.domain_cards[1].level, 1);
 });
 
@@ -669,6 +669,163 @@ Deno.test("Background is properly initialized", () => {
   assertEquals(state.player.background.beliefs, '"The marsh remembers everything" - believes in natural balance and that patience reveals all secrets');
   assertEquals(state.player.background.backgroundStory, "Born in the Singing Marshes, they learned stealth from hunting flies and avoiding predators. When industrial crews began draining their homeland, they turned to thievery - stealing from the companies destroying wetlands and fencing goods to fund resistance efforts.");
   assertEquals(state.player.background.worldConnections, "Part of an underground network smuggling displaced marsh creatures to safety");
+});
+
+Deno.test("Game state formatting for AI injection", () => {
+  const gameManager = createGameManager("test-state-formatting");
+  const state = gameManager.getState();
+  
+  // Test that all required state components are present and formatted correctly
+  assert(typeof state.player.name === 'string');
+  assert(typeof state.player.level === 'number');
+  assert(typeof state.player.class === 'string');
+  assert(typeof state.player.hp.current === 'number');
+  assert(typeof state.player.hp.max === 'number');
+  assert(typeof state.player.stress.current === 'number');
+  assert(typeof state.player.stress.max === 'number');
+  assert(typeof state.player.hope === 'number');
+  assert(typeof state.player.armor.current === 'number');
+  assert(typeof state.player.armor.max === 'number');
+  assert(typeof state.player.evasion === 'number');
+  
+  // Test attributes
+  assert(typeof state.player.attributes.Agility === 'number');
+  assert(typeof state.player.attributes.Strength === 'number');
+  assert(typeof state.player.attributes.Finesse === 'number');
+  assert(typeof state.player.attributes.Instinct === 'number');
+  assert(typeof state.player.attributes.Presence === 'number');
+  assert(typeof state.player.attributes.Knowledge === 'number');
+  
+  // Test background structure
+  assert(typeof state.player.background.motivation === 'string');
+  assert(typeof state.player.background.personality === 'string');
+  assert(typeof state.player.background.beliefs === 'string');
+  assert(typeof state.player.background.backgroundStory === 'string');
+  assert(typeof state.player.background.worldConnections === 'string');
+  assert(typeof state.player.background.secretsAndMysteries === 'string');
+  assert(Array.isArray(state.player.background.importantRelationships));
+  
+  // Test equipment
+  assert(typeof state.player.equipment.weapons.primary.name === 'string');
+  assert(typeof state.player.equipment.weapons.primary.damage === 'string');
+  assert(typeof state.player.equipment.weapons.secondary.name === 'string');
+  assert(typeof state.player.equipment.weapons.secondary.damage === 'string');
+  assert(typeof state.player.equipment.armor.name === 'string');
+  assert(typeof state.player.equipment.armor.armorScore === 'number');
+  
+  // Test features
+  assert(Array.isArray(state.player.features));
+  assert(state.player.features.length > 0);
+  
+  // Test domain cards
+  assert(Array.isArray(state.player.domain_cards));
+  assert(state.player.domain_cards.length > 0);
+  
+  // Test inventory
+  assert(Array.isArray(state.player.inventory));
+  assert(state.player.inventory.length > 0);
+  assert(typeof state.player.gold === 'number');
+  
+  // Test experiences
+  assert(Array.isArray(state.player.experiences));
+  assert(state.player.experiences.length > 0);
+  
+  // Test conditions
+  assert(Array.isArray(state.player.conditions));
+  
+  // Test GM state
+  assert(typeof state.gm.fear === 'number');
+  assert(typeof state.gm.hasSpotlight === 'boolean');
+  
+  // Test scene
+  assert(typeof state.scene.currentScene === 'string');
+  assert(typeof state.scene.sceneDescription === 'string');
+  
+  // Test that the state can be formatted without errors
+  const gameStateInfo = `
+**AKTUELLER SPIELERZUSTAND:**
+- **Name**: ${state.player.name || 'Unbenannt'}
+- **Level**: ${state.player.level}
+- **Klasse**: ${state.player.class}
+- **HP**: ${state.player.hp.current}/${state.player.hp.max}
+- **Stress**: ${state.player.stress.current}/${state.player.stress.max}
+- **Hoffnung**: ${state.player.hope}
+- **Rüstung**: ${state.player.armor.current}/${state.player.armor.max}
+- **Ausweichen**: ${state.player.evasion}
+- **Schwellenwerte**: Major ${state.player.thresholds.major}, Severe ${state.player.thresholds.severe}
+
+**ATTRIBUTE:**
+- Agility: ${state.player.attributes.Agility}
+- Strength: ${state.player.attributes.Strength}
+- Finesse: ${state.player.attributes.Finesse}
+- Instinct: ${state.player.attributes.Instinct}
+- Presence: ${state.player.attributes.Presence}
+- Knowledge: ${state.player.attributes.Knowledge}
+
+**CHARAKTERHINTERGRUND:**
+- **Motivation**: ${state.player.background.motivation}
+- **Persönlichkeit**: ${state.player.background.personality}
+- **Glauben**: ${state.player.background.beliefs}
+- **Geschichte**: ${state.player.background.backgroundStory}
+- **Weltverbindungen**: ${state.player.background.worldConnections}
+- **Wichtige Beziehungen**: ${state.player.background.importantRelationships.join(', ')}
+- **Geheimnisse**: ${state.player.background.secretsAndMysteries}
+
+**AUSRÜSTUNG:**
+- **Primärwaffe**: ${state.player.equipment.weapons.primary.name} (${state.player.equipment.weapons.primary.damage})
+- **Sekundärwaffe**: ${state.player.equipment.weapons.secondary.name} (${state.player.equipment.weapons.secondary.damage})
+- **Rüstung**: ${state.player.equipment.armor.name} (${state.player.equipment.armor.armorScore} Armor)
+
+**FÄHIGKEITEN:**
+${state.player.features.map((f: any) => `- ${f.name}: ${f.description}`).join('\n')}
+
+**DOMAIN-KARTEN:**
+${state.player.domain_cards.map((c: any) => `- ${c.name} (${c.type} Level ${c.level}): ${c.description}`).join('\n')}
+
+**INVENTAR:**
+${state.player.inventory.map((i: any) => `- ${i.name}: ${i.description}`).join('\n')}
+- **Gold**: ${state.player.gold}
+
+**ERFAHRUNGEN:**
+${state.player.experiences.map((e: any) => `- ${e.name}${e.used ? ' (verwendet)' : ''}`).join('\n')}
+
+**ZUSTÄNDE:**
+${state.player.conditions.length > 0 ? state.player.conditions.join(', ') : 'Keine'}
+
+**AKTUELLE POSITION:**
+${state.player.currentLocation}
+
+**GM-ZUSTAND:**
+- **Furcht**: ${state.gm.fear}
+- **Spotlight**: ${state.gm.hasSpotlight ? 'GM' : 'Spieler'}
+
+**SZENE:**
+- **Aktuelle Szene**: ${state.scene.currentScene}
+- **Beschreibung**: ${state.scene.sceneDescription}
+`;
+
+  // Test that the formatted string contains expected content
+  assert(gameStateInfo.includes('AKTUELLER SPIELERZUSTAND'));
+  assert(gameStateInfo.includes('ATTRIBUTE'));
+  assert(gameStateInfo.includes('CHARAKTERHINTERGRUND'));
+  assert(gameStateInfo.includes('AUSRÜSTUNG'));
+  assert(gameStateInfo.includes('FÄHIGKEITEN'));
+  assert(gameStateInfo.includes('DOMAIN-KARTEN'));
+  assert(gameStateInfo.includes('INVENTAR'));
+  assert(gameStateInfo.includes('ERFAHRUNGEN'));
+  assert(gameStateInfo.includes('ZUSTÄNDE'));
+  assert(gameStateInfo.includes('AKTUELLE POSITION'));
+  assert(gameStateInfo.includes('GM-ZUSTAND'));
+  assert(gameStateInfo.includes('SZENE'));
+  
+  // Test that specific values are included
+  assert(gameStateInfo.includes('Rogue'));
+  assert(gameStateInfo.includes('Crossbow'));
+  assert(gameStateInfo.includes('Gambeson Armor'));
+  assert(gameStateInfo.includes('Deft Deceiver'));
+  assert(gameStateInfo.includes('Pick and Pull'));
+  assert(gameStateInfo.includes('Cloaked'));
+  assert(gameStateInfo.includes('Sneak Attack'));
 });
 
 Deno.test("Background can be updated", () => {
