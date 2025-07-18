@@ -16,6 +16,38 @@ The system tracks six core character attributes that affect various game mechani
 
 These attributes can be modified through character advancement, equipment, or other game effects.
 
+### Attribute Usage in Action Rolls
+
+When making action rolls, the corresponding attribute modifier is automatically added to the roll total. For example:
+- A roll using the `agility` trait will add the Agility attribute modifier (+1 by default)
+- A roll using the `strength` trait will add the Strength attribute modifier (-1 by default)
+- A roll using the `finesse` trait will add the Finesse attribute modifier (+2 by default)
+
+The attribute modifier is included in the final roll calculation along with other modifiers like experience bonuses and advantage/disadvantage.
+
+## Character Background
+
+The system now includes a detailed character background with the following components:
+
+### Default Background: Marsh Dweller
+
+**Motivation**: Protecting their homeland from industrial expansion that's draining the wetlands for profit
+
+**Important Relationships**:
+- Elder Croakwise (mentor who taught them stealth)
+- their clutch-sibling Tadwick (captured by poachers)
+- Mama Bullseye (crime boss who gave them their first heist job)
+
+**Secrets & Mysteries**: they're searching for an ancient frog artifact that could restore dried marshlands
+
+**Personality**: Speaks in short, croaking sentences. Patient and observant, but quick to act when opportunity strikes. Tends to sit very still, then move explosively
+
+**Beliefs**: "The marsh remembers everything" - believes in natural balance and that patience reveals all secrets
+
+**Background Story**: Born in the Singing Marshes, they learned stealth from hunting flies and avoiding predators. When industrial crews began draining their homeland, they turned to thievery - stealing from the companies destroying wetlands and fencing goods to fund resistance efforts.
+
+**World Connections**: Part of an underground network smuggling displaced marsh creatures to safety
+
 ## Special Features
 
 The system now tracks special character features that can come from class, background, or other sources. Features can be activated/deactivated and some have level-based progression.
@@ -175,6 +207,17 @@ The following new tools are available via WebSocket:
 }
 ```
 
+### Updating Background Fields
+```javascript
+{
+  "background": {
+    "motivation": "New motivation",
+    "personality": "New personality",
+    "importantRelationships": ["New relationship 1", "New relationship 2"]
+  }
+}
+```
+
 ### Activating a Feature
 ```javascript
 {
@@ -212,6 +255,16 @@ The following new tools are available via WebSocket:
   "useDomainCard": "Deft Deceiver"
 }
 ```
+
+### Action Roll with Attribute Modifier
+```javascript
+{
+  "trait": "agility",
+  "difficulty": 15,
+  "modifier": 2
+}
+```
+This roll will automatically include the Agility attribute modifier (+1 by default) in the total calculation.
 
 
 

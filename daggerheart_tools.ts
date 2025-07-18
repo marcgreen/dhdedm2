@@ -29,19 +29,31 @@ export const createDefaultGameState = () => ({
     domain_cards: [
       {
         name: 'Deft Deceiver',
-        type: 'graceability',
+        type: 'grace',
         level: 1,
         description: 'Spend a Hope to gain advantage on a roll to deceive or trick someone into believing a lie you tell them.'
       },
       {
         name: 'Pick and Pull',
-        type: 'midnightability',
+        type: 'midnight',
         level: 1,
         description: 'You have advantage on action rolls to pick non-magical locks, disarm mechanical traps, or steal items from a target (things like bags, pouches, or containers carried or worn by someone within Melee range).'
       }
     ],
     class: 'Rogue',
-    background: '',
+    background: {
+      motivation: "Protecting their homeland from industrial expansion that's draining the wetlands for profit",
+      importantRelationships: [
+        "Elder Croakwise (mentor who taught them stealth)",
+        "their clutch-sibling Tadwick (captured by poachers)",
+        "Mama Bullseye (crime boss who gave them their first heist job)"
+      ],
+      secretsAndMysteries: "they're searching for an ancient frog artifact that could restore dried marshlands",
+      personality: "Speaks in short, croaking sentences. Patient and observant, but quick to act when opportunity strikes. Tends to sit very still, then move explosively",
+      beliefs: '"The marsh remembers everything" - believes in natural balance and that patience reveals all secrets',
+      backgroundStory: "Born in the Singing Marshes, they learned stealth from hunting flies and avoiding predators. When industrial crews began draining their homeland, they turned to thievery - stealing from the companies destroying wetlands and fencing goods to fund resistance efforts.",
+      worldConnections: "Part of an underground network smuggling displaced marsh creatures to safety"
+    },
     currentLocation: 'Starting Area',
     gold: 10,
     inventory: [
@@ -304,8 +316,22 @@ export class DaggerheartGameManager {
     }
     
     if (args.background) {
-      state.player.background = args.background;
-      changes.push(`background: ${args.background}`);
+      // Handle both string and object background updates
+      if (typeof args.background === 'string') {
+        state.player.background = args.background;
+        changes.push(`background: ${args.background}`);
+      } else if (typeof args.background === 'object') {
+        // Update specific background fields
+        Object.keys(args.background).forEach(field => {
+          if (field === 'importantRelationships' && Array.isArray(args.background[field])) {
+            state.player.background[field] = args.background[field];
+            changes.push(`background.${field}: updated`);
+          } else if (typeof args.background[field] === 'string') {
+            state.player.background[field] = args.background[field];
+            changes.push(`background.${field}: ${args.background[field]}`);
+          }
+        });
+      }
     }
     
     if (args.evasion !== undefined) {

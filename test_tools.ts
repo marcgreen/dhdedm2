@@ -654,6 +654,47 @@ Deno.test("Attribute management", () => {
   assertEquals(state.player.attributes.Knowledge, 1);
 });
 
+Deno.test("Background is properly initialized", () => {
+  const gameManager = createGameManager("test-background");
+  const state = gameManager.getState();
+  
+  // Check that background is initialized with the default structure
+  assertEquals(typeof state.player.background, 'object');
+  assertEquals(state.player.background.motivation, "Protecting their homeland from industrial expansion that's draining the wetlands for profit");
+  assertEquals(Array.isArray(state.player.background.importantRelationships), true);
+  assertEquals(state.player.background.importantRelationships.length, 3);
+  assertEquals(state.player.background.importantRelationships[0], "Elder Croakwise (mentor who taught them stealth)");
+  assertEquals(state.player.background.secretsAndMysteries, "they're searching for an ancient frog artifact that could restore dried marshlands");
+  assertEquals(state.player.background.personality, "Speaks in short, croaking sentences. Patient and observant, but quick to act when opportunity strikes. Tends to sit very still, then move explosively");
+  assertEquals(state.player.background.beliefs, '"The marsh remembers everything" - believes in natural balance and that patience reveals all secrets');
+  assertEquals(state.player.background.backgroundStory, "Born in the Singing Marshes, they learned stealth from hunting flies and avoiding predators. When industrial crews began draining their homeland, they turned to thievery - stealing from the companies destroying wetlands and fencing goods to fund resistance efforts.");
+  assertEquals(state.player.background.worldConnections, "Part of an underground network smuggling displaced marsh creatures to safety");
+});
+
+Deno.test("Background can be updated", () => {
+  const gameManager = createGameManager("test-background-update");
+  
+  // Test updating individual background fields
+  const result = gameManager.updatePlayer({
+    background: {
+      motivation: "New motivation",
+      personality: "New personality"
+    }
+  });
+  
+  assert(result.success);
+  assert(result.changes.includes("background.motivation: New motivation"));
+  assert(result.changes.includes("background.personality: New personality"));
+  
+  // Verify the updates
+  const state = gameManager.getState();
+  assertEquals(state.player.background.motivation, "New motivation");
+  assertEquals(state.player.background.personality, "New personality");
+  
+  // Verify other fields remain unchanged
+  assertEquals(state.player.background.backgroundStory, "Born in the Singing Marshes, they learned stealth from hunting flies and avoiding predators. When industrial crews began draining their homeland, they turned to thievery - stealing from the companies destroying wetlands and fencing goods to fund resistance efforts.");
+});
+
 Deno.test("Attributes are used in action rolls", () => {
   const gameManager = createGameManager("test-attribute-rolls");
   
