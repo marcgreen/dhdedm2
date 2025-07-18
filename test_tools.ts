@@ -15,7 +15,7 @@ const assert = (condition: boolean, message?: string) => {
 };
 
 // Test constants
-const DEFAULT_HP = 10;
+const DEFAULT_HP = 6;
 const DEFAULT_STRESS = 5;
 const DEFAULT_HOPE = 2;
 const MAX_FEAR = 12;
@@ -30,24 +30,24 @@ Deno.test("getState returns default state", () => {
   assertEquals(state.player.name, '');
   assertEquals(state.player.hp.current, DEFAULT_HP);
   assertEquals(state.player.hope, DEFAULT_HOPE);
-  assertEquals(state.gm.fear, 0);
+  assertEquals(state.gm.fear, 2);
   assertEquals(state.gm.hasSpotlight, false);
 });
 
 Deno.test("updatePlayer modifies state correctly", () => {
   const gameManager = createTestManager();
   
-  const result = gameManager.updatePlayer({ name: 'Hans', hope: 3, hp: 8 });
+  const result = gameManager.updatePlayer({ name: 'Hans', hope: 3, hp: 5 });
   
   assertEquals(result.success, true);
   assertEquals(result.newState.hope, 3);
-  assertEquals(result.newState.hp.current, 8);
+  assertEquals(result.newState.hp.current, 5);
   
   // Verify state persists
   const state = gameManager.getState();
   assertEquals(state.player.name, 'Hans');
   assertEquals(state.player.hope, 3);
-  assertEquals(state.player.hp.current, 8);
+  assertEquals(state.player.hp.current, 5);
 });
 
 Deno.test("rollAction mechanics work correctly", () => {
@@ -90,8 +90,8 @@ Deno.test("rollAction mechanics work correctly", () => {
   
   // Verify state was updated correctly
   const state = gameManager.getState();
-  assertEquals(state.player.hope, result.hopeGained);
-  assertEquals(state.gm.fear, result.fearGained);
+  assertEquals(state.player.hope, DEFAULT_HOPE + result.hopeGained);
+  assertEquals(state.gm.fear, 2 + result.fearGained);
   assertEquals(state.gm.hasSpotlight, result.spotlightToGM);
 });
 
@@ -276,7 +276,7 @@ Deno.test("dealDamageToPlayer with thresholds", () => {
   gameManager2.updatePlayer({ armor: 0 });
   
   // Test major damage (at major threshold)
-  const result2 = gameManager2.dealDamageToPlayer({ damage: 5 });
+  const result2 = gameManager2.dealDamageToPlayer({ damage: 7 });
   assertEquals(result2.hpLost, 2);
   assertEquals(result2.thresholdReached, 'major');
   
@@ -285,7 +285,7 @@ Deno.test("dealDamageToPlayer with thresholds", () => {
   gameManager3.updatePlayer({ armor: 0 });
   
   // Test severe damage (at severe threshold)
-  const result3 = gameManager3.dealDamageToPlayer({ damage: 10 });
+  const result3 = gameManager3.dealDamageToPlayer({ damage: 13 });
   assertEquals(result3.hpLost, 3);
   assertEquals(result3.thresholdReached, 'severe');
 });
@@ -298,10 +298,10 @@ Deno.test("dealDamageToPlayer with armor", () => {
   assertEquals(initialState.player.armor.current, 3);
   
   // Attack that would hit major threshold - armor should reduce
-  const result = gameManager.dealDamageToPlayer({ damage: 7 }); // Above major (5)
+  const result = gameManager.dealDamageToPlayer({ damage: 9 }); // Above major (7)
   
   assertEquals(result.armorUsed, true);
-  assert(result.damageAfterReduction < 7); // Damage should be reduced
+  assert(result.damageAfterReduction < 9); // Damage should be reduced
   
   // Verify exactly 1 armor was consumed
   const state = gameManager.getState();
@@ -315,8 +315,8 @@ Deno.test("armor limitation: only 1 slot per damage instance", () => {
   const initialState = gameManager.getState();
   assertEquals(initialState.player.armor.current, 3);
   
-  // First attack: massive damage (20) - should only use 1 armor slot
-  const result1 = gameManager.dealDamageToPlayer({ damage: 20 }); // Massive damage
+  // First attack: massive damage (30) - should only use 1 armor slot
+  const result1 = gameManager.dealDamageToPlayer({ damage: 30 }); // Massive damage
   assertEquals(result1.armorUsed, true);
   assertEquals(result1.thresholdReached, 'severe'); // Reduced from massive to severe
   assertEquals(result1.hpLost, 3); // Severe = 3 HP
@@ -326,7 +326,7 @@ Deno.test("armor limitation: only 1 slot per damage instance", () => {
   assertEquals(state1.player.armor.current, 2); // Only 1 slot consumed
   
   // Second attack: another massive damage - should use another 1 armor slot
-  const result2 = gameManager.dealDamageToPlayer({ damage: 20 });
+  const result2 = gameManager.dealDamageToPlayer({ damage: 30 });
   assertEquals(result2.armorUsed, true);
   assertEquals(result2.thresholdReached, 'severe'); // Again reduced from massive to severe
   
@@ -335,7 +335,7 @@ Deno.test("armor limitation: only 1 slot per damage instance", () => {
   assertEquals(state2.player.armor.current, 1); // Now down to 1
   
   // Third attack: major damage when only 1 armor left
-  const result3 = gameManager.dealDamageToPlayer({ damage: 6 });
+  const result3 = gameManager.dealDamageToPlayer({ damage: 8 });
   assertEquals(result3.armorUsed, true);
   assertEquals(result3.thresholdReached, 'minor'); // Reduced from major to minor
   
@@ -344,7 +344,7 @@ Deno.test("armor limitation: only 1 slot per damage instance", () => {
   assertEquals(state3.player.armor.current, 0); // All armor used up
   
   // Fourth attack: no armor left
-  const result4 = gameManager.dealDamageToPlayer({ damage: 10 });
+  const result4 = gameManager.dealDamageToPlayer({ damage: 13 });
   assertEquals(result4.armorUsed, false); // No armor available
   assertEquals(result4.thresholdReached, 'severe'); // Full damage
   
@@ -436,4 +436,130 @@ Deno.test("spendFear for spotlight", () => {
   // Verify spotlight state
   const updatedState = gameManager.getState();
   assertEquals(updatedState.gm.hasSpotlight, true);
+}); 
+
+Deno.test("Features and equipment are properly initialized", () => {
+  const gameManager = createGameManager("test-session");
+  const state = gameManager.getState();
+  
+  // Check that features are initialized
+  assertEquals(state.player.features.length, 4);
+  assertEquals(state.player.features[0].name, "Cloaked");
+  assertEquals(state.player.features[1].name, "Sneak Attack");
+  assertEquals(state.player.features[1].tier, 1);
+  assertEquals(state.player.features[1].damageDice, 1);
+  
+  // Check that equipment is initialized
+  assertEquals(state.player.equipment.weapons.primary.name, "Crossbow");
+  assertEquals(state.player.equipment.weapons.secondary.name, "Small Dagger");
+  assertEquals(state.player.equipment.armor.name, "Gambeson Armor");
+  
+  // Check that inventory is initialized
+  assertEquals(state.player.inventory.length, 5);
+  assertEquals(state.player.gold, 10);
+  
+  // Check updated default values
+  assertEquals(state.player.hp.current, 6);
+  assertEquals(state.player.hp.max, 6);
+  assertEquals(state.player.evasion, 12);
+  assertEquals(state.player.thresholds.major, 7);
+  assertEquals(state.player.thresholds.severe, 13);
+  assertEquals(state.player.class, "Rogue");
+});
+
+Deno.test("Sneak Attack damage calculation", () => {
+  const gameManager = createGameManager("test-sneak-attack");
+  
+  // Test normal damage without sneak attack
+  const normalResult = gameManager.rollDamage({
+    weaponDice: "1d6+1",
+    proficiency: 1,
+    isSneakAttack: false,
+    allyInMelee: false
+  });
+  
+  // Test damage with sneak attack
+  const sneakResult = gameManager.rollDamage({
+    weaponDice: "1d6+1",
+    proficiency: 1,
+    isSneakAttack: true,
+    allyInMelee: false
+  });
+  
+  // Sneak attack should add extra damage
+  assert(sneakResult.total > normalResult.total);
+  assert(sneakResult.sneakAttackBonus > 0);
+  assert(sneakResult.sneakAttackRolls.length > 0);
+});
+
+Deno.test("Feature tier progression", () => {
+  const gameManager = createGameManager("test-tier-progression");
+  
+  // Start at level 1
+  let state = gameManager.getState();
+  let sneakAttack = state.player.features.find((f: any) => f.name === "Sneak Attack");
+  assertEquals(sneakAttack.tier, 1);
+  assertEquals(sneakAttack.damageDice, 1);
+  
+  // Level up to 2
+  gameManager.updatePlayer({ level: 2 });
+  state = gameManager.getState();
+  sneakAttack = state.player.features.find((f: any) => f.name === "Sneak Attack");
+  assertEquals(sneakAttack.tier, 2);
+  assertEquals(sneakAttack.damageDice, 2);
+  
+  // Level up to 5
+  gameManager.updatePlayer({ level: 5 });
+  state = gameManager.getState();
+  sneakAttack = state.player.features.find((f: any) => f.name === "Sneak Attack");
+  assertEquals(sneakAttack.tier, 3);
+  assertEquals(sneakAttack.damageDice, 3);
+  
+  // Level up to 8
+  gameManager.updatePlayer({ level: 8 });
+  state = gameManager.getState();
+  sneakAttack = state.player.features.find((f: any) => f.name === "Sneak Attack");
+  assertEquals(sneakAttack.tier, 4);
+  assertEquals(sneakAttack.damageDice, 4);
+});
+
+Deno.test("Inventory management", () => {
+  const gameManager = createGameManager("test-inventory");
+  
+  // Test using a consumable item
+  const state = gameManager.getState();
+  const initialInventoryCount = state.player.inventory.length;
+  
+  // Add some stress first so we can test clearing it
+  gameManager.updatePlayer({ stress: 3 });
+  
+  // Use stamina potion
+  const result = gameManager.updateInventory({ useItem: "Minor Stamina Potion" });
+  
+  // Should clear some stress and remove the item
+  assert(result.success);
+  assert(result.changes.length > 0);
+  
+  const newState = gameManager.getState();
+  assert(newState.player.inventory.length < initialInventoryCount);
+});
+
+Deno.test("Equipment management", () => {
+  const gameManager = createGameManager("test-equipment");
+  
+  // Test equipping/unequipping weapons
+  let result = gameManager.updateEquipment({ equipWeapon: { type: "primary" } });
+  assert(result.success);
+  
+  result = gameManager.updateEquipment({ unequipWeapon: { type: "primary" } });
+  assert(result.success);
+  
+  // Test armor threshold updates
+  result = gameManager.updateEquipment({ updateArmorThresholds: true });
+  assert(result.success);
+  
+  const state = gameManager.getState();
+  assertEquals(state.player.thresholds.minor, 6);
+  assertEquals(state.player.thresholds.major, 12);
+  assertEquals(state.player.armor.max, 3);
 }); 

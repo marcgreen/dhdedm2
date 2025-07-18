@@ -9,20 +9,104 @@ export const createDefaultGameState = () => ({
   player: {
     name: '',
     level: 1,
-    hp: { current: 10, max: 10 },
+    hp: { current: 6, max: 6 },
     stress: { current: 0, max: 5 },
     hope: 2,
     armor: { current: 3, max: 3 },
-    evasion: 10,
-    thresholds: { major: 5, severe: 10 },
+    evasion: 12,
+    thresholds: { major: 7, severe: 13 },
     proficiency: 1,
     conditions: [],
     experiences: [],
-    class: '',
+    class: 'Rogue',
     background: '',
     currentLocation: 'Starting Area',
-    gold: '',
-    inventory: []
+    gold: 10,
+    inventory: [
+      {
+        name: 'Torch',
+        type: 'light',
+        description: 'Provides light in dark areas'
+      },
+      {
+        name: '50 feet of rope',
+        type: 'utility',
+        description: 'Useful for climbing and securing items'
+      },
+      {
+        name: 'Basic supplies',
+        type: 'consumable',
+        description: 'Bedroll, rations, waterskin, and other essentials'
+      },
+      {
+        name: 'Minor Stamina Potion',
+        type: 'consumable',
+        description: 'Clear 1d4 Stress',
+        effect: 'clearStress',
+        effectValue: '1d4'
+      },
+      {
+        name: 'Grappling hook',
+        type: 'utility',
+        description: 'A sturdy hook and rope for scaling walls and reaching difficult places'
+      }
+    ],
+    equipment: {
+      weapons: {
+        primary: {
+          name: 'Crossbow',
+          damage: '1d6+1',
+          range: 'Far',
+          properties: ['Finesse'],
+          equipped: true
+        },
+        secondary: {
+          name: 'Small Dagger',
+          damage: '1d8',
+          range: 'Melee',
+          properties: ['Finesse'],
+          equipped: true
+        }
+      },
+      armor: {
+        name: 'Gambeson Armor',
+        armorScore: 3,
+        thresholds: { minor: 6, major: 12 },
+        properties: ['Flexible'],
+        evasionBonus: 1,
+        equipped: true
+      }
+    },
+    features: [
+      {
+        name: 'Cloaked',
+        type: 'class',
+        description: 'Any time you would be Hidden, you are instead Cloaked. In addition to the benefits of the Hidden condition, while Cloaked you remain unseen if you are stationary when an adversary moves to where they would normally see you. After you make an attack or end a move within line of sight of an adversary, you are no longer Cloaked.',
+        active: false
+      },
+      {
+        name: 'Sneak Attack',
+        type: 'class',
+        description: 'When you succeed on an attack while Cloaked or while an ally is within Melee range of your target, add a number of d6s equal to your tier to your damage roll.',
+        tier: 1,
+        damageDice: 1,
+        levelProgression: {
+          2: { tier: 2, damageDice: 2 },
+          5: { tier: 3, damageDice: 3 },
+          8: { tier: 4, damageDice: 4 }
+        }
+      },
+      {
+        name: 'Shadow Stepper',
+        type: 'class',
+        description: 'You can move from shadow to shadow. When you move into an area of darkness or a shadow cast by another creature or object, you can mark a Stress to disappear from where you are and reappear inside another shadow within Far range. When you reappear, you are Cloaked.',
+      },
+      {
+        name: 'Low-Light Living',
+        type: 'heritage',
+        description: 'When you\'re in an area with low light or heavy shadow, you have advantage on rolls to hide, investigate, or perceive details within that area.',
+      }
+    ]
   },
   gm: {
     fear: 2,
@@ -155,8 +239,36 @@ export class DaggerheartGameManager {
     }
     
     if (args.level !== undefined) {
+      const oldLevel = state.player.level;
       state.player.level = args.level;
-      changes.push(`level: ${args.level}`);
+      changes.push(`level: ${oldLevel}→${args.level}`);
+      
+      // Update feature tiers when level changes
+      if (args.level > oldLevel) {
+        state.player.features.forEach((feature: any) => {
+          if (feature.levelProgression) {
+            let newTier = 1;
+            let newDamageDice = 1;
+            
+            // Find the highest applicable tier for current level
+            Object.keys(feature.levelProgression).forEach(levelKey => {
+              const reqLevel = parseInt(levelKey);
+              if (args.level >= reqLevel) {
+                const progression = feature.levelProgression[reqLevel];
+                newTier = progression.tier;
+                newDamageDice = progression.damageDice;
+              }
+            });
+            
+            if (feature.tier !== newTier) {
+              const oldTier = feature.tier;
+              feature.tier = newTier;
+              feature.damageDice = newDamageDice;
+              changes.push(`${feature.name} tier updated: ${oldTier}→${newTier}`);
+            }
+          }
+        });
+      }
     }
     
     if (args.location) {
@@ -229,8 +341,190 @@ export class DaggerheartGameManager {
         background: state.player.background,
         evasion: state.player.evasion,
         proficiency: state.player.proficiency,
-        thresholds: state.player.thresholds
+        thresholds: state.player.thresholds,
+        features: state.player.features,
+        equipment: state.player.equipment,
+        inventory: state.player.inventory,
+        gold: state.player.gold
       }
+    };
+  }
+
+  // Feature management methods
+  updateFeatures(args: any) {
+    const state = this.getGameState();
+    const changes: string[] = [];
+    
+    // Activate/deactivate features
+    if (args.activateFeature) {
+      const feature = state.player.features.find((f: any) => f.name === args.activateFeature);
+      if (feature) {
+        feature.active = true;
+        changes.push(`feature activated: ${args.activateFeature}`);
+      }
+    }
+    
+    if (args.deactivateFeature) {
+      const feature = state.player.features.find((f: any) => f.name === args.deactivateFeature);
+      if (feature) {
+        feature.active = false;
+        changes.push(`feature deactivated: ${args.deactivateFeature}`);
+      }
+    }
+    
+    // Update feature tiers based on level
+    if (args.updateFeatureTiers) {
+      state.player.features.forEach((feature: any) => {
+        if (feature.levelProgression) {
+          const level = state.player.level;
+          let newTier = 1;
+          let newDamageDice = 1;
+          
+          // Find the highest applicable tier for current level
+          Object.keys(feature.levelProgression).forEach(levelKey => {
+            const reqLevel = parseInt(levelKey);
+            if (level >= reqLevel) {
+              const progression = feature.levelProgression[reqLevel];
+              newTier = progression.tier;
+              newDamageDice = progression.damageDice;
+            }
+          });
+          
+          if (feature.tier !== newTier) {
+            const oldTier = feature.tier;
+            feature.tier = newTier;
+            feature.damageDice = newDamageDice;
+            changes.push(`${feature.name} tier updated: ${oldTier}→${newTier}`);
+          }
+        }
+      });
+    }
+    
+    this.updateGameState({ player: state.player });
+    
+    return {
+      success: true,
+      changes,
+      features: state.player.features
+    };
+  }
+
+  // Equipment management methods
+  updateEquipment(args: any) {
+    const state = this.getGameState();
+    const changes: string[] = [];
+    
+    // Equip/unequip weapons
+    if (args.equipWeapon) {
+      const weaponType = args.equipWeapon.type || 'primary';
+      const weapon = state.player.equipment.weapons[weaponType];
+      if (weapon) {
+        weapon.equipped = true;
+        changes.push(`equipped weapon: ${weapon.name}`);
+      }
+    }
+    
+    if (args.unequipWeapon) {
+      const weaponType = args.unequipWeapon.type || 'primary';
+      const weapon = state.player.equipment.weapons[weaponType];
+      if (weapon) {
+        weapon.equipped = false;
+        changes.push(`unequipped weapon: ${weapon.name}`);
+      }
+    }
+    
+    // Equip/unequip armor
+    if (args.equipArmor) {
+      state.player.equipment.armor.equipped = true;
+      changes.push(`equipped armor: ${state.player.equipment.armor.name}`);
+    }
+    
+    if (args.unequipArmor) {
+      state.player.equipment.armor.equipped = false;
+      changes.push(`unequipped armor: ${state.player.equipment.armor.name}`);
+    }
+    
+    // Update armor thresholds based on equipped armor
+    if (args.updateArmorThresholds) {
+      const armor = state.player.equipment.armor;
+      if (armor.equipped) {
+        state.player.thresholds.minor = armor.thresholds.minor;
+        state.player.thresholds.major = armor.thresholds.major;
+        state.player.armor.max = armor.armorScore;
+        state.player.evasion += armor.evasionBonus || 0;
+        changes.push(`armor thresholds updated: minor=${armor.thresholds.minor}, major=${armor.thresholds.major}`);
+      }
+    }
+    
+    this.updateGameState({ player: state.player });
+    
+    return {
+      success: true,
+      changes,
+      equipment: state.player.equipment
+    };
+  }
+
+  // Inventory management methods
+  updateInventory(args: any) {
+    const state = this.getGameState();
+    const changes: string[] = [];
+    
+    // Add item to inventory
+    if (args.addItem) {
+      const newItem = {
+        name: args.addItem.name,
+        type: args.addItem.type || 'utility',
+        description: args.addItem.description || '',
+        effect: args.addItem.effect,
+        effectValue: args.addItem.effectValue
+      };
+      state.player.inventory.push(newItem);
+      changes.push(`added item: ${newItem.name}`);
+    }
+    
+    // Remove item from inventory
+    if (args.removeItem) {
+      const index = state.player.inventory.findIndex((item: any) => item.name === args.removeItem);
+      if (index > -1) {
+        const removedItem = state.player.inventory.splice(index, 1)[0];
+        changes.push(`removed item: ${removedItem.name}`);
+      }
+    }
+    
+    // Use consumable item
+    if (args.useItem) {
+      const item = state.player.inventory.find((i: any) => i.name === args.useItem);
+      if (item && item.type === 'consumable') {
+        if (item.effect === 'clearStress') {
+          const stressToClear = item.effectValue === '1d4' ? rollDice(4, 1)[0] : parseInt(item.effectValue);
+          const oldStress = state.player.stress.current;
+          state.player.stress.current = Math.max(0, state.player.stress.current - stressToClear);
+          changes.push(`used ${item.name}: cleared ${stressToClear} stress (${oldStress}→${state.player.stress.current})`);
+          
+          // Remove the consumed item
+          const index = state.player.inventory.findIndex((i: any) => i.name === args.useItem);
+          if (index > -1) {
+            state.player.inventory.splice(index, 1);
+          }
+        }
+      }
+    }
+    
+    // Update gold
+    if (args.gold !== undefined) {
+      const oldGold = state.player.gold;
+      state.player.gold = Math.max(0, state.player.gold + args.gold);
+      changes.push(`gold: ${oldGold}→${state.player.gold}`);
+    }
+    
+    this.updateGameState({ player: state.player });
+    
+    return {
+      success: true,
+      changes,
+      inventory: state.player.inventory,
+      gold: state.player.gold
     };
   }
 
@@ -332,7 +626,7 @@ export class DaggerheartGameManager {
 
   // Phase 2: Combat damage calculation
   rollDamage(args: any) {
-    const { weaponDice, proficiency, isCritical = false, fearBonus = 0 } = args;
+    const { weaponDice, proficiency, isCritical = false, fearBonus = 0, isSneakAttack = false, allyInMelee = false } = args;
     
     // Parse weapon dice (e.g., "1d8+2")
     const diceMatch = weaponDice.match(/(\d+)d(\d+)(?:\+(\d+))?/);
@@ -362,14 +656,28 @@ export class DaggerheartGameManager {
     const fearBonusRolls = fearBonus > 0 ? rollDice(4, fearBonus) : [];
     const fearBonusTotal = fearBonusRolls.reduce((sum, roll) => sum + roll, 0);
     
-    const total = withModifier + maxDamage + fearBonusTotal;
+    // Check for Sneak Attack bonus
+    let sneakAttackBonus = 0;
+    let sneakAttackRolls: number[] = [];
+    const state = this.getGameState();
+    const sneakAttackFeature = state.player.features.find((f: any) => f.name === 'Sneak Attack');
+    
+    if (sneakAttackFeature && (isSneakAttack || allyInMelee)) {
+      const damageDice = sneakAttackFeature.damageDice || 1;
+      sneakAttackRolls = rollDice(6, damageDice);
+      sneakAttackBonus = sneakAttackRolls.reduce((sum, roll) => sum + roll, 0);
+    }
+    
+    const total = withModifier + maxDamage + fearBonusTotal + sneakAttackBonus;
     
     return {
       total,
       rolls,
       maxDamage,
       fearBonusRolls,
-      breakdown: `${count}d${sides}×${proficiency}${baseModifier > 0 ? `+${baseModifier}` : baseModifier < 0 ? `${baseModifier}` : ''}${maxDamage > 0 ? `+${maxDamage}(max)` : ''}${fearBonusTotal > 0 ? `+${fearBonusTotal}(fear)` : ''}`
+      sneakAttackRolls,
+      sneakAttackBonus,
+      breakdown: `${count}d${sides}×${proficiency}${baseModifier > 0 ? `+${baseModifier}` : baseModifier < 0 ? `${baseModifier}` : ''}${maxDamage > 0 ? `+${maxDamage}(max)` : ''}${fearBonusTotal > 0 ? `+${fearBonusTotal}(fear)` : ''}${sneakAttackBonus > 0 ? `+${sneakAttackBonus}(sneak)` : ''}`
     };
   }
 

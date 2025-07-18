@@ -322,31 +322,61 @@ const createDaggerheartTools = (sessionId: string) => {
 
   const updateInventoryTool = tool({
     name: 'update_inventory',
-    description: 'Update character inventory (add/remove items)',
-    strict: false,
+    description: 'Enhanced inventory management (add/remove items, use consumables, manage gold)',
     parameters: {
       type: 'object',
       properties: {
+        // Legacy parameters for backward compatibility
         action: { type: 'string', enum: ['add', 'remove'] },
         item: { type: 'string' },
         quantity: { type: 'number', default: 1 },
         gold: { type: 'string' },
+        // Enhanced parameters
+        addItem: { 
+          type: 'object', 
+          properties: {
+            name: { type: 'string' },
+            type: { type: 'string', enum: ['utility', 'consumable', 'light'] },
+            description: { type: 'string' },
+            effect: { type: 'string' },
+            effectValue: { type: 'string' }
+          }
+        },
+        removeItem: { type: 'string' },
+        useItem: { type: 'string' },
+        goldEnhanced: { type: 'number' }
       },
       required: [],
-      additionalProperties: true,
+      additionalProperties: false,
     },
     async execute(args: any) {
       const now = new Date().toISOString();
       let output, error = null;
       try {
-        if (args.gold) {
+        // Handle legacy format
+        if (args.gold && typeof args.gold === 'string') {
           output = `Gold updated: ${args.gold}`;
         } else if (args.item) {
           const action = args.action || 'add';
           const quantity = args.quantity || 1;
           output = `${action === 'add' ? 'Added' : 'Removed'} ${quantity}x ${args.item}`;
         } else {
-          output = `Inventory updated`;
+          // Use enhanced functionality
+          // Convert goldEnhanced to gold for the game manager
+          const enhancedArgs = { ...args };
+          if (args.goldEnhanced !== undefined) {
+            enhancedArgs.gold = args.goldEnhanced;
+            delete enhancedArgs.goldEnhanced;
+          }
+          output = gameManager.updateInventory(enhancedArgs);
+          const gameState = gameManager.getState();
+          const toolResult: ToolResult = {
+            name: 'update_inventory',
+            parameters: args,
+            output: output,
+            gameState: gameState
+          };
+          sendGameStateUpdate(sessionId, toolResult);
         }
       } catch (err) {
         error = err instanceof Error ? err.message : String(err);
@@ -368,14 +398,16 @@ const createDaggerheartTools = (sessionId: string) => {
   // Phase 2 Tool: Roll damage with weapon dice
   const rollDamageTool = tool({
     name: 'roll_damage',
-    description: 'Schaden würfeln mit Waffen-Würfeln × Fertigkeit',
+    description: 'Schaden würfeln mit Waffen-Würfeln × Fertigkeit (inkl. Sneak Attack)',
     parameters: {
       type: 'object',
       properties: {
         weaponDice: { type: 'string' }, // e.g., "1d8+2"
         proficiency: { type: 'number', minimum: 1 },
         isCritical: { type: 'boolean' },
-        fearBonus: { type: 'number', minimum: 0 }
+        fearBonus: { type: 'number', minimum: 0 },
+        isSneakAttack: { type: 'boolean' },
+        allyInMelee: { type: 'boolean' }
       },
       required: ['weaponDice', 'proficiency'],
       additionalProperties: false,
@@ -514,6 +546,98 @@ const createDaggerheartTools = (sessionId: string) => {
     },
   });
 
+  // Feature management tool
+  const updateFeaturesTool = tool({
+    name: 'update_features',
+    description: 'Manage character features (activate/deactivate, update tiers)',
+    parameters: {
+      type: 'object',
+      properties: {
+        activateFeature: { type: 'string' },
+        deactivateFeature: { type: 'string' },
+        updateFeatureTiers: { type: 'boolean' }
+      },
+      required: [],
+      additionalProperties: false,
+    },
+    async execute(args: any) {
+      const now = new Date().toISOString();
+      let output, error = null;
+      try {
+        output = gameManager.updateFeatures(args);
+        const gameState = gameManager.getState();
+        const toolResult: ToolResult = {
+          name: 'update_features',
+          parameters: args,
+          output: output,
+          gameState: gameState
+        };
+        sendGameStateUpdate(sessionId, toolResult);
+      } catch (err) {
+        error = err instanceof Error ? err.message : String(err);
+      }
+      logToolCall(sessionId, {
+        type: 'tool_call',
+        name: 'update_features',
+        status: error ? 'failed' : 'succeeded',
+        arguments: args,
+        output: error ? undefined : output,
+        error: error || undefined,
+        timestamp: now,
+      });
+      if (error) throw error;
+      return output;
+    },
+  });
+
+  // Equipment management tool
+  const updateEquipmentTool = tool({
+    name: 'update_equipment',
+    description: 'Manage character equipment (equip/unequip weapons and armor)',
+    parameters: {
+      type: 'object',
+      properties: {
+        equipWeapon: { type: 'object', properties: { type: { type: 'string', enum: ['primary', 'secondary'] } } },
+        unequipWeapon: { type: 'object', properties: { type: { type: 'string', enum: ['primary', 'secondary'] } } },
+        equipArmor: { type: 'boolean' },
+        unequipArmor: { type: 'boolean' },
+        updateArmorThresholds: { type: 'boolean' }
+      },
+      required: [],
+      additionalProperties: false,
+    },
+    async execute(args: any) {
+      const now = new Date().toISOString();
+      let output, error = null;
+      try {
+        output = gameManager.updateEquipment(args);
+        const gameState = gameManager.getState();
+        const toolResult: ToolResult = {
+          name: 'update_equipment',
+          parameters: args,
+          output: output,
+          gameState: gameState
+        };
+        sendGameStateUpdate(sessionId, toolResult);
+      } catch (err) {
+        error = err instanceof Error ? err.message : String(err);
+      }
+      logToolCall(sessionId, {
+        type: 'tool_call',
+        name: 'update_equipment',
+        status: error ? 'failed' : 'succeeded',
+        arguments: args,
+        output: error ? undefined : output,
+        error: error || undefined,
+        timestamp: now,
+      });
+      if (error) throw error;
+      return output;
+    },
+  });
+
+
+
   return [
     getStateTool,
     updatePlayerTool,
@@ -527,6 +651,8 @@ const createDaggerheartTools = (sessionId: string) => {
     manageQuestsTool,
     trackLanguageTool,
     updateInventoryTool,
+    updateFeaturesTool,
+    updateEquipmentTool,
   ];
 };
 
