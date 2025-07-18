@@ -2,6 +2,20 @@
 
 This document describes the special features and equipment tracking system implemented for the Daggerheart game.
 
+## Character Attributes
+
+The system tracks six core character attributes that affect various game mechanics:
+
+### Default Starting Attributes
+- **Agility**: +1
+- **Strength**: -1  
+- **Finesse**: +2
+- **Instinct**: +0
+- **Presence**: +1
+- **Knowledge**: +0
+
+These attributes can be modified through character advancement, equipment, or other game effects.
+
 ## Special Features
 
 The system now tracks special character features that can come from class, background, or other sources. Features can be activated/deactivated and some have level-based progression.
@@ -76,6 +90,12 @@ The system tracks weapons, armor, and inventory items with their properties and 
 
 ## API Methods
 
+### Attribute Management
+
+#### `updateAttributes(args)`
+- Individual attributes: `Agility`, `Strength`, `Finesse`, `Instinct`, `Presence`, `Knowledge`
+- `attributes`: Update all attributes at once with an object containing the new values
+
 ### Feature Management
 
 #### `updateFeatures(args)`
@@ -124,13 +144,36 @@ The damage calculation now includes:
 
 The following new tools are available via WebSocket:
 
-1. **`update_features`** - Manage character features
-2. **`update_equipment`** - Manage equipment
-3. **`update_inventory`** - Enhanced inventory management (merged functionality)
-4. **`update_domain_cards`** - Manage domain cards
-5. **`roll_damage`** - Updated to include Sneak Attack parameters
+1. **`update_attributes`** - Manage character attributes
+2. **`update_features`** - Manage character features
+3. **`update_equipment`** - Manage equipment
+4. **`update_inventory`** - Enhanced inventory management (merged functionality)
+5. **`update_domain_cards`** - Manage domain cards
+6. **`roll_damage`** - Updated to include Sneak Attack parameters
 
 ## Usage Examples
+
+### Updating Individual Attributes
+```javascript
+{
+  "Agility": 2,
+  "Strength": 0
+}
+```
+
+### Updating All Attributes
+```javascript
+{
+  "attributes": {
+    "Agility": 2,
+    "Strength": 0,
+    "Finesse": 3,
+    "Instinct": 1,
+    "Presence": 2,
+    "Knowledge": 1
+  }
+}
+```
 
 ### Activating a Feature
 ```javascript

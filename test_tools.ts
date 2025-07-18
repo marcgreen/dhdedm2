@@ -107,7 +107,7 @@ Deno.test("rollAction with modifiers", () => {
   });
   
   // Test that modifiers are applied correctly
-  const expectedBase = result.rolls.hope + result.rolls.fear + 3 + 2 + result.modifierRoll;
+  const expectedBase = result.rolls.hope + result.rolls.fear + 3 + 2 + result.modifierRoll + result.attributeModifier;
   assertEquals(result.total, expectedBase);
   
   // Test that advantage generated a modifier
@@ -606,3 +606,86 @@ Deno.test("Domain card management", () => {
   const state = gameManager.getState();
   assertEquals(state.player.domain_cards.length, 3);
 }); 
+
+Deno.test("Attributes are properly initialized", () => {
+  const gameManager = createGameManager("test-attributes");
+  const state = gameManager.getState();
+  
+  // Check that attributes are initialized with default values
+  assertEquals(state.player.attributes.Agility, 1);
+  assertEquals(state.player.attributes.Strength, -1);
+  assertEquals(state.player.attributes.Finesse, 2);
+  assertEquals(state.player.attributes.Instinct, 0);
+  assertEquals(state.player.attributes.Presence, 1);
+  assertEquals(state.player.attributes.Knowledge, 0);
+});
+
+Deno.test("Attribute management", () => {
+  const gameManager = createGameManager("test-attribute-management");
+  
+  // Test updating individual attributes
+  let result = gameManager.updateAttributes({ Agility: 2, Strength: 0 });
+  assert(result.success);
+  assert(result.changes.includes("Agility: 1→2"));
+  assert(result.changes.includes("Strength: -1→0"));
+  
+  // Test updating all attributes at once
+  result = gameManager.updateAttributes({
+    attributes: {
+      Finesse: 3,
+      Instinct: 1,
+      Presence: 2,
+      Knowledge: 1
+    }
+  });
+  assert(result.success);
+  assert(result.changes.includes("Finesse: 2→3"));
+  assert(result.changes.includes("Instinct: 0→1"));
+  assert(result.changes.includes("Presence: 1→2"));
+  assert(result.changes.includes("Knowledge: 0→1"));
+  
+  // Verify final state
+  const state = gameManager.getState();
+  assertEquals(state.player.attributes.Agility, 2);
+  assertEquals(state.player.attributes.Strength, 0);
+  assertEquals(state.player.attributes.Finesse, 3);
+  assertEquals(state.player.attributes.Instinct, 1);
+  assertEquals(state.player.attributes.Presence, 2);
+  assertEquals(state.player.attributes.Knowledge, 1);
+});
+
+Deno.test("Attributes are used in action rolls", () => {
+  const gameManager = createGameManager("test-attribute-rolls");
+  
+  // Set up specific attributes
+  gameManager.updateAttributes({
+    Agility: 2,
+    Strength: -1,
+    Finesse: 3
+  });
+  
+  // Test action roll with Agility trait
+  const result = gameManager.rollAction({ 
+    trait: 'agility', 
+    difficulty: 15 
+  });
+  
+  // Verify attribute modifier is included
+  assertEquals(result.attributeModifier, 2);
+  
+  // Test action roll with Strength trait
+  const strengthResult = gameManager.rollAction({ 
+    trait: 'strength', 
+    difficulty: 15 
+  });
+  
+  assertEquals(strengthResult.attributeModifier, -1);
+  
+  // Test action roll with Finesse trait
+  const finesseResult = gameManager.rollAction({ 
+    trait: 'finesse', 
+    difficulty: 15 
+  });
+  
+  assertEquals(finesseResult.attributeModifier, 3);
+});

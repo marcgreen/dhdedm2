@@ -18,6 +18,14 @@ export const createDefaultGameState = () => ({
     proficiency: 1,
     conditions: [],
     experiences: ['Springloaded Legs', 'Silent Steps'],
+    attributes: {
+      Agility: 1,
+      Strength: -1,
+      Finesse: 2,
+      Instinct: 0,
+      Presence: 1,
+      Knowledge: 0
+    },
     domain_cards: [
       {
         name: 'Deft Deceiver',
@@ -360,7 +368,8 @@ export class DaggerheartGameManager {
         equipment: state.player.equipment,
         inventory: state.player.inventory,
         gold: state.player.gold,
-        domain_cards: state.player.domain_cards
+        domain_cards: state.player.domain_cards,
+        attributes: state.player.attributes
       }
     };
   }
@@ -523,6 +532,42 @@ export class DaggerheartGameManager {
     };
   }
 
+  // Attribute management methods
+  updateAttributes(args: any) {
+    const state = this.getGameState();
+    const changes: string[] = [];
+    
+    // Update individual attributes
+    const attributeNames = ['Agility', 'Strength', 'Finesse', 'Instinct', 'Presence', 'Knowledge'];
+    
+    attributeNames.forEach(attrName => {
+      if (args[attrName] !== undefined) {
+        const oldValue = state.player.attributes[attrName];
+        state.player.attributes[attrName] = args[attrName];
+        changes.push(`${attrName}: ${oldValue}→${args[attrName]}`);
+      }
+    });
+    
+    // Update all attributes at once
+    if (args.attributes) {
+      Object.keys(args.attributes).forEach(attrName => {
+        if (attributeNames.includes(attrName)) {
+          const oldValue = state.player.attributes[attrName];
+          state.player.attributes[attrName] = args.attributes[attrName];
+          changes.push(`${attrName}: ${oldValue}→${args.attributes[attrName]}`);
+        }
+      });
+    }
+    
+    this.updateGameState({ player: state.player });
+    
+    return {
+      success: true,
+      changes,
+      attributes: state.player.attributes
+    };
+  }
+
   // Inventory management methods
   updateInventory(args: any) {
     const state = this.getGameState();
@@ -601,7 +646,14 @@ export class DaggerheartGameManager {
     const disadvantageRoll = rollD6Modifier(args.disadvantage || 0);
     const modifierRoll = advantageRoll + disadvantageRoll;
     
-    const total = hopeRoll + fearRoll + baseModifier + experienceBonus + modifierRoll;
+    // Get attribute modifier based on trait
+    let attributeModifier = 0;
+    if (args.trait) {
+      const traitName = args.trait.charAt(0).toUpperCase() + args.trait.slice(1);
+      attributeModifier = state.player.attributes[traitName] || 0;
+    }
+    
+    const total = hopeRoll + fearRoll + baseModifier + experienceBonus + modifierRoll + attributeModifier;
     const succeeded = total >= args.difficulty;
     
     // Determine result type based on Hope vs Fear
@@ -673,6 +725,7 @@ export class DaggerheartGameManager {
       total,
       rolls: { hope: hopeRoll, fear: fearRoll },
       modifierRoll,
+      attributeModifier,
       succeeded,
       hopeGained,
       fearGained,

@@ -688,6 +688,64 @@ const createDaggerheartTools = (sessionId: string) => {
     },
   });
 
+  // Attribute management tool
+  const updateAttributesTool = tool({
+    name: 'update_attributes',
+    description: 'Manage character attributes (Agility, Strength, Finesse, Instinct, Presence, Knowledge)',
+    parameters: {
+      type: 'object',
+      properties: {
+        Agility: { type: 'number' },
+        Strength: { type: 'number' },
+        Finesse: { type: 'number' },
+        Instinct: { type: 'number' },
+        Presence: { type: 'number' },
+        Knowledge: { type: 'number' },
+        attributes: { 
+          type: 'object', 
+          properties: {
+            Agility: { type: 'number' },
+            Strength: { type: 'number' },
+            Finesse: { type: 'number' },
+            Instinct: { type: 'number' },
+            Presence: { type: 'number' },
+            Knowledge: { type: 'number' }
+          }
+        }
+      },
+      required: [],
+      additionalProperties: false,
+    },
+    async execute(args: any) {
+      const now = new Date().toISOString();
+      let output, error = null;
+      try {
+        output = gameManager.updateAttributes(args);
+        const gameState = gameManager.getState();
+        const toolResult: ToolResult = {
+          name: 'update_attributes',
+          parameters: args,
+          output: output,
+          gameState: gameState
+        };
+        sendGameStateUpdate(sessionId, toolResult);
+      } catch (err) {
+        error = err instanceof Error ? err.message : String(err);
+      }
+      logToolCall(sessionId, {
+        type: 'tool_call',
+        name: 'update_attributes',
+        status: error ? 'failed' : 'succeeded',
+        arguments: args,
+        output: error ? undefined : output,
+        error: error || undefined,
+        timestamp: now,
+      });
+      if (error) throw error;
+      return output;
+    },
+  });
+
   return [
     getStateTool,
     updatePlayerTool,
@@ -704,6 +762,7 @@ const createDaggerheartTools = (sessionId: string) => {
     updateFeaturesTool,
     updateEquipmentTool,
     updateDomainCardsTool,
+    updateAttributesTool,
   ];
 };
 
