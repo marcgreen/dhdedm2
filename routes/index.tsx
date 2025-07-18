@@ -15,7 +15,7 @@ export default function Home() {
           </p>
         </div>
         
-        <div class="bg-white rounded-xl shadow-2xl p-8 w-full max-w-md">
+        <div class="bg-white rounded-xl shadow-2xl p-8 w-full max-w-7xl">
           <VoiceChat />
         </div>
         

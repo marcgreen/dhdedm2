@@ -803,7 +803,7 @@ export default function VoiceChat(_props: VoiceChatProps) {
   }
 
   return (
-    <div class="max-w-6xl mx-auto p-4 space-y-6">
+    <div class="max-w-7xl mx-auto p-4 space-y-6">
       {/* Main Voice Interface */}
       <div class="text-center bg-gradient-to-br from-purple-900 to-blue-900 p-8 rounded-xl shadow-2xl">
         <h1 class="text-2xl font-bold text-white mb-2">Der Spielleiter</h1>
@@ -858,9 +858,9 @@ export default function VoiceChat(_props: VoiceChatProps) {
       </div>
 
       {/* Game State Display */}
-      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div class="flex flex-col lg:flex-row gap-6 w-full">
         {/* Character Sheet */}
-        <div class="bg-slate-800 p-6 rounded-xl shadow-xl">
+        <div class="bg-slate-800 p-6 rounded-xl shadow-xl w-full min-w-0">
           <h2 class="text-xl font-bold text-white mb-4 flex items-center">
             ⚔️ Charakterbogen
           </h2>
@@ -1014,7 +1014,7 @@ export default function VoiceChat(_props: VoiceChatProps) {
         </div>
 
         {/* Current Scene */}
-        <div class="bg-slate-800 p-6 rounded-xl shadow-xl">
+        <div class="bg-slate-800 p-6 rounded-xl shadow-xl w-full min-w-0">
           <h2 class="text-xl font-bold text-white mb-4 flex items-center">
             🏰 Aktuelle Szene
           </h2>
@@ -1052,7 +1052,7 @@ export default function VoiceChat(_props: VoiceChatProps) {
         </div>
 
         {/* Language Learning Progress */}
-        <div class="bg-slate-800 p-6 rounded-xl shadow-xl">
+        <div class="bg-slate-800 p-6 rounded-xl shadow-xl w-full min-w-0">
           <h2 class="text-xl font-bold text-white mb-4 flex items-center">
             📚 Sprachfortschritt
           </h2>
