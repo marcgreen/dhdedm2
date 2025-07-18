@@ -2,6 +2,7 @@ import { useSignal } from "@preact/signals";
 import { useEffect, useRef } from "preact/hooks";
 import { IS_BROWSER } from "$fresh/runtime.ts";
 import { GameState, ConversationItem, ToolResult } from "../types.ts";
+import { createDefaultGameState } from "../daggerheart_tools.ts";
 
 interface VoiceChatProps {}
 
@@ -29,39 +30,7 @@ export default function VoiceChat(_props: VoiceChatProps) {
   const currentAssistantMessageRef = useRef<ConversationItem | null>(null);
   const lastSyncTimeRef = useRef<number>(0);
   const uiState = useSignal<UIState>({
-    gameState: {
-      player: {
-        name: "",
-        level: 1,
-        hp: { current: 10, max: 10 },
-        stress: { current: 0, max: 10 },
-        hope: 2,
-        armor: { current: 0, max: 0 },
-        evasion: 10,
-        thresholds: { major: 5, severe: 10 },
-        proficiency: 1,
-        conditions: [],
-        experiences: [],
-        class: "",
-        background: "",
-        currentLocation: "Starting Area",
-        gold: "",
-        inventory: []
-      },
-      gm: {
-        fear: 0,
-        hasSpotlight: false
-      },
-      scene: {
-        currentScene: "Character Creation",
-        sceneDescription: "Du stehst am Beginn eines neuen Abenteuers...",
-        activeQuests: [],
-        countdowns: []
-      },
-      sessionId: "",
-      languageCorrections: 0,
-      vocabularyIntroduced: []
-    },
+    gameState: createDefaultGameState(),
     conversationHistory: []
   });
 

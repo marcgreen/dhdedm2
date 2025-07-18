@@ -24,10 +24,14 @@ export interface PlayerState {
   conditions: string[];
   experiences: string[];
   class: string;
-  background: string;
+  background: any; // Allow complex background object
   currentLocation: string;
-  gold: string;
-  inventory: string[];
+  gold: string | number;
+  inventory: any[]; // Allow complex inventory items
+  attributes?: any;
+  domain_cards?: any[];
+  equipment?: any;
+  features?: any[];
 }
 
 export interface GMState {
