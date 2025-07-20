@@ -107,14 +107,8 @@ const createDaggerheartTools = (sessionId: string) => {
       let output, error: string | null = null;
       try {
         output = gameManager.updatePlayer(args);
-        const gameState = gameManager.getState();
-        const toolResult: ToolResult = {
-          name: 'update_player',
-          parameters: args,
-          output: output,
-          gameState: gameState
-        };
-        sendGameStateUpdate(sessionId, toolResult);
+        // Don't send full game state update for player updates
+        // Only log the tool call without sending game state
       } catch (err) {
         error = err instanceof Error ? err.message : String(err);
       }
