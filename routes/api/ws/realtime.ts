@@ -824,6 +824,82 @@ export const handler: Handlers = {
 
     socket.onmessage = async (event) => {
       try {
+        // Check if this is a binary message (audio data from client)
+        if (event.data instanceof ArrayBuffer) {
+          const data = new Uint8Array(event.data);
+          
+          // Check message type from first byte
+          if (data.length > 0 && data[0] === 0x01) {
+            // Binary audio message from client - extract audio data (skip first byte header)
+            const audioData = data.slice(1);
+            const arrayBuffer = audioData.buffer;
+            
+            if (!realtimeSession) {
+              console.error('No realtime session available for audio processing');
+              socket.send(JSON.stringify({ 
+                type: 'error', 
+                error: 'Realtime session not initialized' 
+              }));
+              return;
+            }
+            
+            try {
+              // Send PCM16 audio to OpenAI Realtime API
+              if (typeof realtimeSession.sendAudio === 'function') {
+                try {
+                  const result = await realtimeSession.sendAudio(arrayBuffer);
+                  
+                  // Check session state less frequently for debugging
+                  if (Math.random() < 0.001) { // Very rarely log session state
+                    setTimeout(() => {
+                      try {
+                        if (!realtimeSession) return;
+                        
+                        const session = realtimeSession as any;
+                        if (session && session.getState) {
+                          console.log('Session state check:', typeof session.getState());
+                        }
+                      } catch (e) {
+                        // Silently ignore session state check errors
+                      }
+                    }, 100);
+                  }
+                } catch (audioError) {
+                  console.error('Error sending audio to OpenAI:', audioError);
+                  
+                  // Don't send every audio error to client as they can be frequent
+                  // Only send critical errors that might affect the session
+                  const errorObj = audioError as any;
+                  if (errorObj && 
+                      errorObj.error && 
+                      errorObj.error.code && 
+                      errorObj.error.code !== 'response_cancel_not_active') {
+                    socket.send(JSON.stringify({ 
+                      type: 'audio_error', 
+                      error: errorObj.error.message || 'Audio processing error' 
+                    }));
+                  }
+                }
+              } else {
+                console.error('sendAudio method not available on RealtimeSession');
+                socket.send(JSON.stringify({ 
+                  type: 'error', 
+                  error: 'sendAudio method not available' 
+                }));
+              }
+            } catch (error) {
+              console.error('Error processing binary audio:', error);
+              const errorMessage = error instanceof Error ? error.message : String(error);
+              socket.send(JSON.stringify({ 
+                type: 'error', 
+                error: `Binary audio processing failed: ${errorMessage}`
+              }));
+            }
+            return;
+          }
+        }
+        
+        // Handle JSON messages
         const message = JSON.parse(event.data);
         // console.log('Received WebSocket message:', message.type);
         
@@ -1574,25 +1650,33 @@ ${sceneGuide}`;
                 
                 if (audioData) {
                   try {
-                    let base64Audio;
+                    let audioBytes: Uint8Array;
                     
                     if (audioData instanceof ArrayBuffer) {
-                      base64Audio = btoa(String.fromCharCode(...new Uint8Array(audioData)));
+                      audioBytes = new Uint8Array(audioData);
                     } else if (audioData instanceof Uint8Array) {
-                      base64Audio = btoa(String.fromCharCode(...audioData));
+                      audioBytes = audioData;
                     } else if (typeof audioData === 'string') {
-                      base64Audio = audioData;
+                      // Handle string audio data if needed
+                      const binaryString = atob(audioData);
+                      audioBytes = new Uint8Array(binaryString.length);
+                      for (let i = 0; i < binaryString.length; i++) {
+                        audioBytes[i] = binaryString.charCodeAt(i);
+                      }
                     } else {
                       console.log('Unknown audio data format:', typeof audioData);
+                      return;
                     }
                     
-                    if (base64Audio) {
-                      socket.send(JSON.stringify({ 
-                        type: 'audio', 
-                        audio: base64Audio
-                      }));
-                    } else {
-                      console.log('Failed to convert audio data to base64');
+                    // Send binary audio data directly (much faster than base64)
+                    if (socket.readyState === WebSocket.OPEN) {
+                      // Create binary message with audio type header
+                      const header = new Uint8Array([0x01]); // 0x01 = audio message type
+                      const message = new Uint8Array(header.length + audioBytes.length);
+                      message.set(header, 0);
+                      message.set(audioBytes, header.length);
+                      
+                      socket.send(message);
                     }
                   } catch (error) {
                     console.error('Error processing audio data:', error);
@@ -1817,6 +1901,7 @@ ${sceneGuide}`;
             break;
 
           case 'audio':
+            // Legacy base64 audio messages (fallback for older clients)
             if (!realtimeSession) {
               console.error('No realtime session available for audio processing');
               socket.send(JSON.stringify({ 
@@ -1832,14 +1917,13 @@ ${sceneGuide}`;
             }
 
             try {
-              // Convert base64 back to ArrayBuffer (PCM16 format)
+              // Optimized base64 to ArrayBuffer conversion for mobile
               const binaryString = atob(message.audio);
-              const arrayBuffer = new ArrayBuffer(binaryString.length);
-              const view = new Uint8Array(arrayBuffer);
-              
+              const bytes = new Uint8Array(binaryString.length);
               for (let i = 0; i < binaryString.length; i++) {
-                view[i] = binaryString.charCodeAt(i);
+                bytes[i] = binaryString.charCodeAt(i);
               }
+              const arrayBuffer = bytes.buffer;
               
               // Send PCM16 audio to OpenAI Realtime API
               if (typeof realtimeSession.sendAudio === 'function') {

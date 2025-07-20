@@ -308,8 +308,38 @@ export default function VoiceChat(_props: VoiceChatProps) {
       }));
     };
 
-    ws.onmessage = (event) => {
+    ws.onmessage = async (event) => {
       try {
+        // Check if this is a binary message (audio data) - handle both ArrayBuffer and Blob
+        if (event.data instanceof ArrayBuffer || event.data instanceof Blob) {
+          console.log('Received binary message, type:', event.data.constructor.name, 'size:', event.data instanceof Blob ? event.data.size : event.data.byteLength);
+          
+          // Convert Blob to ArrayBuffer if needed
+          let arrayBuffer: ArrayBuffer;
+          if (event.data instanceof Blob) {
+            // Convert Blob to ArrayBuffer
+            const response = await event.data.arrayBuffer();
+            arrayBuffer = response;
+          } else {
+            arrayBuffer = event.data;
+          }
+          
+          const data = new Uint8Array(arrayBuffer);
+          console.log('Converted to Uint8Array, length:', data.length, 'first byte:', data[0]);
+          
+          // Check message type from first byte
+          if (data.length > 0 && data[0] === 0x01) {
+            // Audio message - extract audio data (skip first byte header)
+            const audioData = data.slice(1);
+            console.log('Processing audio data, length:', audioData.length);
+            
+            // Pass binary audio data directly to playAudio
+            playAudio(audioData);
+            return;
+          }
+        }
+        
+        // Handle JSON messages as before
         const message = JSON.parse(event.data);
         
         switch (message.type) {
@@ -473,13 +503,13 @@ export default function VoiceChat(_props: VoiceChatProps) {
             view.setInt16(i * 2, intSample, true);
           }
           
-          // Convert to base64 for transmission
-          const base64 = btoa(String.fromCharCode(...new Uint8Array(pcm16Buffer)));
+          // Send binary audio data directly (much faster than base64)
+          const header = new Uint8Array([0x01]); // 0x01 = audio message type
+          const message = new Uint8Array(header.length + pcm16Buffer.byteLength);
+          message.set(header, 0);
+          message.set(new Uint8Array(pcm16Buffer), header.length);
           
-          wsRef.current.send(JSON.stringify({
-            type: 'audio',
-            audio: base64
-          }));
+          wsRef.current.send(message);
         }
       };
       
@@ -522,7 +552,10 @@ export default function VoiceChat(_props: VoiceChatProps) {
 
   // Process audio queue - plays audio chunks sequentially
   const processAudioQueue = async () => {
+    console.log('processAudioQueue called, isPlaying:', isPlayingAudioRef.current, 'queue length:', audioQueueRef.current.length);
+    
     if (isPlayingAudioRef.current || audioQueueRef.current.length === 0) {
+      console.log('Skipping processAudioQueue - already playing or empty queue');
       return;
     }
     
@@ -586,6 +619,7 @@ export default function VoiceChat(_props: VoiceChatProps) {
       };
       
       // Start playback
+      console.log('Starting audio playback at time:', startTime, 'duration:', duration);
       source.start(startTime);
       
     } catch (error) {
@@ -721,22 +755,33 @@ export default function VoiceChat(_props: VoiceChatProps) {
     }
   };
 
-  // Queue received PCM16 audio data for sequential playback
-  const playAudio = async (base64Audio: string) => {
+    // Queue received PCM16 audio data for sequential playback
+  const playAudio = async (audioData: string | Uint8Array) => {
     try {
-      // Decode base64 to binary string
-      const audioData = atob(base64Audio);
+      console.log('playAudio called with:', typeof audioData, 'length:', audioData instanceof Uint8Array ? audioData.length : 'string');
       
-      // Convert binary string to ArrayBuffer
-      const arrayBuffer = new ArrayBuffer(audioData.length);
-      const uint8View = new Uint8Array(arrayBuffer);
-      for (let i = 0; i < audioData.length; i++) {
-        uint8View[i] = audioData.charCodeAt(i);
+      let arrayBuffer: ArrayBuffer;
+      
+      if (typeof audioData === 'string') {
+        // Handle base64 audio (legacy format)
+        const binaryString = atob(audioData);
+        arrayBuffer = new ArrayBuffer(binaryString.length);
+        const uint8View = new Uint8Array(arrayBuffer);
+        for (let i = 0; i < binaryString.length; i++) {
+          uint8View[i] = binaryString.charCodeAt(i);
+        }
+      } else {
+        // Handle binary audio data directly
+        arrayBuffer = audioData.buffer as ArrayBuffer;
       }
+      
+      console.log('ArrayBuffer size:', arrayBuffer.byteLength);
       
       // Create DataView for proper endian handling
       const dataView = new DataView(arrayBuffer);
       const sampleCount = arrayBuffer.byteLength / 2; // 2 bytes per 16-bit sample
+      
+      console.log('Sample count:', sampleCount);
       
       // Convert to Float32Array for AudioBuffer (PCM16 to Float32)
       const float32Data = new Float32Array(sampleCount);
@@ -747,8 +792,12 @@ export default function VoiceChat(_props: VoiceChatProps) {
         float32Data[i] = int16Sample / 32768.0;
       }
       
+      console.log('Float32Array created, length:', float32Data.length);
+      
       // Add to audio queue
       audioQueueRef.current.push(float32Data);
+      
+      console.log('Audio added to queue, queue length:', audioQueueRef.current.length);
       
       // Start processing queue if not already playing
       if (!isPlayingAudioRef.current) {
