@@ -50,7 +50,7 @@ const createDaggerheartTools = (sessionId: string) => {
     },
     async execute(args: any = {}) {
       const now = getTimeOnlyTimestamp();
-      let output, error = null;
+      let output, error: string | null = null;
       try {
         output = gameManager.getState();
       } catch (err) {
@@ -104,7 +104,7 @@ const createDaggerheartTools = (sessionId: string) => {
     },
     async execute(args: any) {
       const now = getTimeOnlyTimestamp();
-      let output, error = null;
+      let output, error: string | null = null;
       try {
         output = gameManager.updatePlayer(args);
         const gameState = gameManager.getState();
@@ -155,7 +155,7 @@ const createDaggerheartTools = (sessionId: string) => {
     },
     async execute(args: any) {
       const now = getTimeOnlyTimestamp();
-      let output, error = null;
+      let output, error: string | null = null;
       try {
         output = gameManager.rollAction(args);
       } catch (err) {
@@ -191,7 +191,7 @@ const createDaggerheartTools = (sessionId: string) => {
     },
     async execute(args: any) {
       const now = getTimeOnlyTimestamp();
-      let output, error = null;
+      let output, error: string | null = null;
       try {
         output = `Scene updated: ${args.scene} - ${args.description}`;
       } catch (err) {
@@ -227,7 +227,7 @@ const createDaggerheartTools = (sessionId: string) => {
     },
     async execute(args: any) {
       const now = getTimeOnlyTimestamp();
-      let output, error = null;
+      let output, error: string | null = null;
       try {
         const rolls: number[] = [];
         const count = args.count || 1;
@@ -271,7 +271,7 @@ const createDaggerheartTools = (sessionId: string) => {
     },
     async execute(args: any) {
       const now = getTimeOnlyTimestamp();
-      let output, error = null;
+      let output, error: string | null = null;
       try {
         output = `Quest ${args.action}: ${args.quest}`;
       } catch (err) {
@@ -306,7 +306,7 @@ const createDaggerheartTools = (sessionId: string) => {
     },
     async execute(args: any) {
       const now = getTimeOnlyTimestamp();
-      let output, error = null;
+      let output, error: string | null = null;
       try {
         output = `Language progress updated`;
       } catch (err) {
@@ -357,7 +357,7 @@ const createDaggerheartTools = (sessionId: string) => {
     },
     async execute(args: any) {
       const now = getTimeOnlyTimestamp();
-      let output, error = null;
+      let output, error: string | null = null;
       try {
         // Handle legacy format
         if (args.gold && typeof args.gold === 'string') {
@@ -420,7 +420,7 @@ const createDaggerheartTools = (sessionId: string) => {
     },
     async execute(args: any) {
       const now = getTimeOnlyTimestamp();
-      let output, error = null;
+      let output, error: string | null = null;
       try {
         output = gameManager.rollDamage(args);
       } catch (err) {
@@ -459,7 +459,7 @@ const createDaggerheartTools = (sessionId: string) => {
     },
     async execute(args: any) {
       const now = getTimeOnlyTimestamp();
-      let output, error = null;
+      let output, error: string | null = null;
       try {
         output = gameManager.dealDamageToPlayer(args);
       } catch (err) {
@@ -496,7 +496,7 @@ const createDaggerheartTools = (sessionId: string) => {
     },
     async execute(args: any) {
       const now = getTimeOnlyTimestamp();
-      let output, error = null;
+      let output, error: string | null = null;
       try {
         output = gameManager.makeAdversaryAttack(args);
       } catch (err) {
@@ -532,7 +532,7 @@ const createDaggerheartTools = (sessionId: string) => {
     },
     async execute(args: any) {
       const now = getTimeOnlyTimestamp();
-      let output, error = null;
+      let output, error: string | null = null;
       try {
         output = gameManager.spendFear(args);
       } catch (err) {
@@ -568,7 +568,7 @@ const createDaggerheartTools = (sessionId: string) => {
     },
     async execute(args: any) {
       const now = getTimeOnlyTimestamp();
-      let output, error = null;
+      let output, error: string | null = null;
       try {
         output = gameManager.updateFeatures(args);
         const gameState = gameManager.getState();
@@ -1649,6 +1649,8 @@ ${sceneGuide}`;
                       output: tc.output
                     })));
                   }
+                  
+
                 }
                 
                 // Merge tool call logs for this session
@@ -1669,6 +1671,7 @@ ${sceneGuide}`;
                     const hour24 = isPM && hours !== 12 ? hours + 12 : (hours === 12 && !isPM ? 0 : hours);
                     return hour24 * 3600 + minutes * 60 + (seconds || 0);
                   }
+                  
                   // If it's a full date string, extract just the time part
                   try {
                     const date = new Date(timestamp);
@@ -1679,23 +1682,104 @@ ${sceneGuide}`;
                   }
                 };
                 
-                // Merge and sort by timestamp or itemId
-                const mergedHistory = [...history, ...sessionToolCalls].sort((a, b) => {
-                  // Use timestamp if available, otherwise use itemId for ordering
-                  const timeA = getTimeValue(a.timestamp);
-                  const timeB = getTimeValue(b.timestamp);
+                // Helper function to get a sortable timestamp for any item
+                const getSortableTimestamp = (item: any) => {
+                  // For tool calls, use the timestamp directly
+                  if (item.type === 'tool_call' && item.timestamp) {
+                    return getTimeValue(item.timestamp);
+                  }
                   
+                  // For OpenAI history items, try to extract timestamp from various fields
+                  if (item.timestamp) {
+                    return getTimeValue(item.timestamp);
+                  }
+                  
+                  // Check for created_at field (common in OpenAI responses)
+                  if (item.created_at) {
+                    return getTimeValue(item.created_at);
+                  }
+                  
+                  // Check for created field (alternative timestamp field)
+                  if (item.created) {
+                    return getTimeValue(item.created);
+                  }
+                  
+                  // For items without timestamp, try to infer from itemId or position
+                  if (item.itemId) {
+                    // Extract timestamp from itemId if it contains one
+                    const timestampMatch = item.itemId.match(/(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})/);
+                    if (timestampMatch) {
+                      return getTimeValue(timestampMatch[1]);
+                    }
+                  }
+                  
+                  return 0;
+                };
+                
+                // Create a more sophisticated sorting function (kept for reference but not used)
+                const sortHistoryItems = (a: any, b: any) => {
+                  const timeA = getSortableTimestamp(a);
+                  const timeB = getSortableTimestamp(b);
+                  
+                  // If both have valid timestamps, sort by time
                   if (timeA > 0 && timeB > 0) {
                     return timeA - timeB;
                   }
                   
-                  // Fallback to itemId ordering for OpenAI history items
+                  // If only one has timestamp, prioritize the one with timestamp
+                  if (timeA > 0 && timeB === 0) return -1;
+                  if (timeA === 0 && timeB > 0) return 1;
+                  
+                  // If neither has timestamp, try to use itemId for ordering
                   if (a.itemId && b.itemId) {
                     return a.itemId.localeCompare(b.itemId);
                   }
                   
+                  // If one has itemId and the other doesn't, prioritize the one with itemId
+                  if (a.itemId && !b.itemId) return -1;
+                  if (!a.itemId && b.itemId) return 1;
+                  
+                  // Final fallback: maintain original order
                   return 0;
-                });
+                };
+                
+                // Insert tool calls at the correct chronological position
+                const insertToolCallsAtCorrectPosition = (history: any[], toolCalls: any[]) => {
+                  const result = [...history];
+                  
+                  for (const toolCall of toolCalls) {
+                    const toolCallTime = getTimeValue(toolCall.timestamp);
+                    
+                    // Find the position to insert the tool call
+                    let insertIndex = result.length; // Default to end
+                    
+                    // Since OpenAI history items don't have reliable timestamps,
+                    // we need to use a different approach. Let's insert tool calls
+                    // after the most recent user message that triggered them.
+                    
+                    // Find the last user message in the history
+                    let lastUserMessageIndex = -1;
+                    for (let i = result.length - 1; i >= 0; i--) {
+                      if (result[i].type === 'message' && result[i].role === 'user') {
+                        lastUserMessageIndex = i;
+                        break;
+                      }
+                    }
+                    
+                    // If we found a user message, insert tool calls after it
+                    if (lastUserMessageIndex >= 0) {
+                      insertIndex = lastUserMessageIndex + 1;
+                    }
+                    
+                    // Insert the tool call at the found position
+                    result.splice(insertIndex, 0, toolCall);
+                  }
+                  
+                  return result;
+                };
+                
+                // Insert tool calls at correct positions instead of sorting
+                const mergedHistory = insertToolCallsAtCorrectPosition(history, sessionToolCalls);
                 sockets.get(sessionId!)?.send(JSON.stringify({
                   type: 'history_updated',
                   history: mergedHistory
