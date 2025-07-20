@@ -1208,18 +1208,18 @@ export default function VoiceChat(_props: VoiceChatProps) {
                   return (
                     <div key={index} class={`p-3 rounded-lg ${
                       message.role === 'user' 
-                        ? 'bg-blue-900 ml-4 border-l-2 border-blue-400' 
-                        : 'bg-purple-900 mr-4 border-l-2 border-purple-400'
+                        ? 'bg-white ml-4 border-l-2 border-green-500' 
+                        : 'bg-white mr-4 border-l-2 border-blue-500'
                     }`}>
                       <div class="flex justify-between items-start mb-1">
                         <span class={`text-xs font-semibold ${
-                          message.role === 'user' ? 'text-blue-300' : 'text-purple-300'
+                          message.role === 'user' ? 'text-green-700' : 'text-blue-700'
                         }`}>
                           {message.role === 'user' ? 'Du' : 'Der Spielleiter'}
                         </span>
                         <span class="text-gray-500 text-xs">{message.timestamp}</span>
                       </div>
-                      <div class="text-gray-200 text-sm leading-relaxed">
+                      <div class="text-black text-sm leading-relaxed">
                         {message.content}
                       </div>
                     </div>
