@@ -837,9 +837,7 @@ export default function VoiceChat(_props: VoiceChatProps) {
     <div class="max-w-7xl mx-auto p-4 space-y-6">
       {/* Main Voice Interface */}
       <div class="text-center bg-gradient-to-br from-purple-900 to-blue-900 p-8 rounded-xl shadow-2xl">
-        <h1 class="text-2xl font-bold text-white mb-2">Der Spielleiter</h1>
-        <p class="text-purple-200 mb-6">Deutsches D&D • German Learning through Gaming</p>
-        
+      
         <div class="mb-6">
           <button
             onClick={toggleVoiceChat}
@@ -874,18 +872,18 @@ export default function VoiceChat(_props: VoiceChatProps) {
           </div>
         )}
         
-        <div class="space-y-2">
-          <p class={`text-lg font-semibold ${
-            isConnected.value ? 'text-green-300' : 
-            isConnecting.value ? 'text-yellow-300' : 'text-gray-300'
-          }`}>
-            {status.value}
-          </p>
-          
+                  <div class="space-y-2">
+            <p class={`text-lg font-semibold ${
+              isConnected.value ? 'text-green-300' : 
+              isConnecting.value ? 'text-yellow-300' : 'text-gray-300'
+            }`}>
+              {status.value}
+            </p>
+            
           <div class="text-sm text-purple-200">
-            {isConnected.value ? 'Klicke zum Stoppen' : 'Klicke zum Starten'}
+              {isConnected.value ? 'Klicke zum Stoppen' : 'Klicke zum Starten'}
+            </div>
           </div>
-        </div>
       </div>
 
       {/* Game State Display */}
