@@ -137,17 +137,28 @@ export default function VoiceChat(_props: VoiceChatProps) {
 
   // Helper function to sync with server conversation history
   const syncConversationHistory = (history: any[]) => {
-    // Throttle rapid sync calls to prevent race conditions
-    const now = Date.now();
-    if (now - lastSyncTimeRef.current < 500) { // 500ms throttle
-      console.log('Skipping sync - too soon since last sync');
-      return;
-    }
-    lastSyncTimeRef.current = now;
+    // Remove the throttle that's preventing transcript updates
+    // const now = Date.now();
+    // if (now - lastSyncTimeRef.current < 500) { // 500ms throttle
+    //   console.log('Skipping sync - too soon since last sync');
+    //   return;
+    // }
+    // lastSyncTimeRef.current = now;
+    
+    console.log('Processing history update with', history?.length || 0, 'items');
     
     const formattedHistory: ConversationItem[] = [];
     
     history.forEach((item: any) => {
+      console.log('Processing history item:', {
+        type: item.type,
+        role: item.role,
+        status: item.status,
+        hasContent: !!item.content,
+        contentType: typeof item.content,
+        isArray: Array.isArray(item.content)
+      });
+      
       if (item.type === 'message') {
         let content = '';
         
@@ -276,6 +287,8 @@ export default function VoiceChat(_props: VoiceChatProps) {
       ...uiState.value, 
       conversationHistory: [...localConversationRef.current]
     };
+    
+    console.log('UI state updated with', localConversationRef.current.length, 'messages in conversation history');
   };
 
   // Set up WebSocket connection
@@ -326,6 +339,11 @@ export default function VoiceChat(_props: VoiceChatProps) {
           break;
           
         case 'history_updated':
+          console.log('=== CLIENT RECEIVED HISTORY_updated ===');
+          console.log('Message type:', message.type);
+          console.log('History data type:', typeof message.history);
+          console.log('History length:', Array.isArray(message.history) ? message.history.length : 'not array');
+          console.log('History sample:', message.history ? JSON.stringify(message.history.slice(0, 2), null, 2) : 'no history');
           syncConversationHistory(message.history);
           break;
           
@@ -1194,4 +1212,4 @@ export default function VoiceChat(_props: VoiceChatProps) {
       )}
     </div>
   );
-} 
+}

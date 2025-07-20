@@ -1630,7 +1630,10 @@ ${sceneGuide}`;
 
               // Listen for conversation history updates (documented API)
               realtimeSession.on('history_updated', (history: any) => {
-                // console.log('Conversation history updated, sending to client');
+                console.log('=== HISTORY UPDATED EVENT ===');
+                console.log('History type:', typeof history);
+                console.log('History length:', Array.isArray(history) ? history.length : 'not array');
+                console.log('History structure:', JSON.stringify(history, null, 2).substring(0, 500) + '...');
                 
                 // Debug: Log the structure to see if tool calls are included
                 if (history && Array.isArray(history)) {
@@ -1638,13 +1641,13 @@ ${sceneGuide}`;
                     item.type === 'function_call' || item.type === 'tool_call'
                   );
                   if (toolCalls.length > 0) {
-                    // console.log('Found tool calls in history:', toolCalls.map((tc: any) => ({
-                    //   type: tc.type,
-                    //   name: tc.name,
-                    //   status: tc.status,
-                    //   arguments: tc.arguments,
-                    //   output: tc.output
-                    // })));
+                    console.log('Found tool calls in history:', toolCalls.map((tc: any) => ({
+                      type: tc.type,
+                      name: tc.name,
+                      status: tc.status,
+                      arguments: tc.arguments,
+                      output: tc.output
+                    })));
                   }
                 }
                 
@@ -1652,7 +1655,12 @@ ${sceneGuide}`;
                 const sessionToolCalls = toolCallLogs.get(sessionId!) || [];
                 
                 // Helper function to convert time string to comparable value
-                const getTimeValue = (timestamp: string) => {
+                const getTimeValue = (timestamp: string | undefined) => {
+                  // Handle undefined timestamp
+                  if (!timestamp) {
+                    return 0;
+                  }
+                  
                   // If timestamp is already a time string (HH:MM:SS AM/PM), convert to comparable format
                   if (timestamp.includes(':') && (timestamp.includes('AM') || timestamp.includes('PM'))) {
                     const timeStr = timestamp.replace(/\s*(AM|PM)/i, '');
@@ -1671,11 +1679,22 @@ ${sceneGuide}`;
                   }
                 };
                 
-                // Merge and sort by timestamp
+                // Merge and sort by timestamp or itemId
                 const mergedHistory = [...history, ...sessionToolCalls].sort((a, b) => {
+                  // Use timestamp if available, otherwise use itemId for ordering
                   const timeA = getTimeValue(a.timestamp);
                   const timeB = getTimeValue(b.timestamp);
-                  return timeA - timeB;
+                  
+                  if (timeA > 0 && timeB > 0) {
+                    return timeA - timeB;
+                  }
+                  
+                  // Fallback to itemId ordering for OpenAI history items
+                  if (a.itemId && b.itemId) {
+                    return a.itemId.localeCompare(b.itemId);
+                  }
+                  
+                  return 0;
                 });
                 sockets.get(sessionId!)?.send(JSON.stringify({
                   type: 'history_updated',
@@ -1793,7 +1812,7 @@ ${sceneGuide}`;
               const errorMessage = error instanceof Error ? error.message : String(error);
               socket.send(JSON.stringify({ 
                 type: 'error', 
-                error: `Audio processing failed: ${errorMessage}` 
+                error: `Audio processing failed: ${errorMessage}`
               }));
             }
             break;
@@ -1859,4 +1878,4 @@ ${sceneGuide}`;
 
     return response;
   },
-}; 
+};
