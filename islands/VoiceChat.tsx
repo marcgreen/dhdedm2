@@ -1184,7 +1184,7 @@ export default function VoiceChat(_props: VoiceChatProps) {
             💬 Unterhaltung
             <span class="ml-2 text-sm text-gray-400">({uiState.value.conversationHistory.length})</span>
           </h2>
-          <div class="space-y-3 text-sm max-h-64 overflow-y-auto">
+          <div class="space-y-3 text-sm max-h-256 overflow-y-auto">
             {uiState.value.conversationHistory.length > 0 ? (
               uiState.value.conversationHistory.slice(-20).map((message, index) => {
                 if (message.role === 'tool' || message.type === 'tool_call') {
